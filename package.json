@@ -1,0 +1,30 @@
+{
+  "name": "ott-platform",
+  "version": "1.0.0",
+  "description": "OTT 웹 플랫폼 - LG U+ 시그니처 디자인",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "^15.0.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "typescript": "^5.0.0",
+    "@types/react": "^18.0.0",
+    "@types/node": "^20.0.0",
+    "@types/react-dom": "^18.0.0",
+    "styled-components": "^6.0.0",
+    "@types/styled-components": "^5.1.0",
+    "lucide-react": "^0.400.0",
+    "@reduxjs/toolkit": "^2.0.0",
+    "react-redux": "^9.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.0.0",
+    "eslint-config-next": "^15.0.0"
+  }
+}

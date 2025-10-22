@@ -11,7 +11,9 @@ interface CardProps {
   onClick?: () => void;
 }
 
-const StyledCard = styled.div<Omit<CardProps, 'hover'> & { $hover?: boolean }>`
+const StyledCard = styled.div.withConfig({
+  shouldForwardProp: (prop) => !['variant', 'padding', 'hover'].includes(prop),
+})<Omit<CardProps, 'hover'> & { $hover?: boolean }>`
   background-color: ${theme.colors.white};
   border-radius: ${theme.borderRadius.xl};
   transition: all 0.2s ease;

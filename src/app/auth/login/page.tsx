@@ -8,6 +8,7 @@ import { Eye, EyeOff, Mail, Lock, ArrowLeft } from 'lucide-react';
 import Button from '../../../components/common/Button';
 import Input from '../../../components/common/Input';
 import Card from '../../../components/common/Card';
+import { authApi, tokenManager, LoginRequest } from '../../../services/api';
 
 const Container = styled.div`
   min-height: 100vh;
@@ -450,18 +451,33 @@ export default function LoginPage() {
     setError('');
 
     try {
-      // 실제 로그인 로직 구현
-      console.log('로그인 시도:', formData);
+      // API 호출을 위한 데이터 준비
+      const loginData: LoginRequest = {
+        email: formData.email,
+        password: formData.password,
+      };
+
+      console.log('로그인 API 호출:', loginData);
       
-      // 임시 로딩 시뮬레이션
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // 백엔드 API 호출
+      const response = await authApi.login(loginData);
       
-      // 로그인 성공 시 홈으로 리다이렉트
-      console.log('로그인 성공! 홈으로 이동합니다.');
-      router.push('/');
-    } catch (err) {
-      console.error('로그인 에러:', err);
-      setError('로그인에 실패했습니다. 이메일과 비밀번호를 확인해주세요.');
+      if (response.success && response.data) {
+        // 토큰 저장
+        tokenManager.setToken(response.data.token);
+        
+        console.log('로그인 성공! 토큰 저장 완료');
+        console.log('사용자 정보:', response.data);
+        
+        // 홈으로 리다이렉트
+        router.push('/');
+      } else {
+        setError(response.message || '로그인에 실패했습니다.');
+      }
+      
+    } catch (error: any) {
+      console.error('로그인 API 에러:', error);
+      setError(error.message || '로그인에 실패했습니다. 이메일과 비밀번호를 확인해주세요.');
     } finally {
       setIsLoading(false);
     }

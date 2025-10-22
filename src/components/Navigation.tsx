@@ -220,7 +220,7 @@ export default function Navigation() {
   };
 
   return (
-    <NavContainer>
+    <NavContainer suppressHydrationWarning>
       <NavContent>
         <NavTop>
           <Logo href="/">

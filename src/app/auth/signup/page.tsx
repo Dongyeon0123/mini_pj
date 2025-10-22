@@ -2,11 +2,13 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import styled from 'styled-components';
 import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, Check } from 'lucide-react';
 import Button from '../../../components/common/Button';
 import Input from '../../../components/common/Input';
 import Card from '../../../components/common/Card';
+import { authApi, SignupRequest } from '../../../services/api';
 
 const Container = styled.div`
   min-height: 100vh;
@@ -428,12 +430,14 @@ const getPasswordStrengthText = (strength: number): string => {
 };
 
 export default function SignupPage() {
+  const router = useRouter();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
     email: '',
     password: '',
     confirmPassword: '',
+    phoneNumber: '',
     agreeToTerms: false,
     agreeToMarketing: false,
   });
@@ -480,20 +484,33 @@ export default function SignupPage() {
     }
 
     try {
-      // 실제 회원가입 로직 구현
-      console.log('회원가입 시도:', formData);
+      // API 호출을 위한 데이터 준비
+      const signupData: SignupRequest = {
+        email: formData.email,
+        password: formData.password,
+        name: formData.firstName + (formData.lastName ? ` ${formData.lastName}` : ''),
+        phoneNumber: formData.phoneNumber || undefined,
+      };
+
+      console.log('회원가입 API 호출:', signupData);
       
-      // 임시 로딩 시뮬레이션
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // 백엔드 API 호출
+      const response = await authApi.signup(signupData);
       
-      setSuccess('회원가입이 완료되었습니다! 로그인 페이지로 이동합니다.');
+      if (response.success) {
+        setSuccess('회원가입이 완료되었습니다! 로그인 페이지로 이동합니다.');
+        
+        // 2초 후 로그인 페이지로 리다이렉트
+        setTimeout(() => {
+          window.location.href = '/auth/login';
+        }, 2000);
+      } else {
+        setError(response.message || '회원가입에 실패했습니다.');
+      }
       
-      // 2초 후 로그인 페이지로 리다이렉트
-      setTimeout(() => {
-        window.location.href = '/auth/login';
-      }, 2000);
-    } catch (err) {
-      setError('회원가입에 실패했습니다. 다시 시도해주세요.');
+    } catch (error: any) {
+      console.error('회원가입 API 에러:', error);
+      setError(error.message || '회원가입 중 오류가 발생했습니다. 다시 시도해주세요.');
     } finally {
       setIsLoading(false);
     }

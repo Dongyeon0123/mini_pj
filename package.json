@@ -4,8 +4,10 @@
   "description": "OTT 웹 플랫폼 - LG U+ 시그니처 디자인",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "NODE_OPTIONS='--max-old-space-size=4096' next dev",
+    "dev:win": "cross-env NODE_OPTIONS=--max-old-space-size=4096 next dev",
+    "build": "NODE_OPTIONS='--max-old-space-size=4096' next build",
+    "build:win": "set NODE_OPTIONS=--max-old-space-size=4096 && next build",
     "start": "next start",
     "lint": "next lint"
   },

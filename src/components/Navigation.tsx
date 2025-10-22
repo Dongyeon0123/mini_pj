@@ -207,16 +207,29 @@ export default function Navigation() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userInfo, setUserInfo] = useState<{ name: string; email: string } | null>(null);
+  const [userInfo, setUserInfo] = useState<{ name: string; email: string; role: string } | null>(null);
 
-  const navItems = [
+  // 기본 네비게이션 아이템
+  const baseNavItems = [
     { href: '/', label: '홈', icon: Home },
     { href: '/movies', label: '영화', icon: Film },
     { href: '/series', label: '시리즈', icon: Tv },
     { href: '/favorites', label: '찜한 콘텐츠', icon: Heart },
-    { href: '/admin', label: '관리자', icon: Shield },
     { href: '/contact', label: '연락처', icon: Mail },
   ];
+
+  // 관리자 메뉴
+  const adminNavItem = { href: '/admin', label: '관리자', icon: Shield };
+
+  // 사용자 역할에 따른 네비게이션 아이템 생성
+  const getNavItems = () => {
+    if (userInfo?.role === 'ADMIN') {
+      return [...baseNavItems, adminNavItem];
+    }
+    return baseNavItems;
+  };
+
+  const navItems = getNavItems();
 
   // 로그인 상태 확인
   useEffect(() => {

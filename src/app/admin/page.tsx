@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import styled from 'styled-components';
+import { tokenManager } from '../../services/api';
 import { 
   Users, 
   Film, 
@@ -410,8 +412,64 @@ const QuickActionDescription = styled.p`
 `;
 
 export default function AdminDashboard() {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // 관리자 권한 확인
+  useEffect(() => {
+    const checkAdminAuth = () => {
+      const token = tokenManager.getToken();
+      const userInfo = localStorage.getItem('userInfo');
+      
+      if (!token || !userInfo) {
+        // 로그인하지 않은 경우
+        router.push('/auth/login');
+        return;
+      }
+
+      try {
+        const user = JSON.parse(userInfo);
+        if (user.role !== 'ADMIN') {
+          // 관리자가 아닌 경우
+          alert('관리자 권한이 필요합니다.');
+          router.push('/');
+          return;
+        }
+        
+        setIsAuthorized(true);
+      } catch (error) {
+        console.error('사용자 정보 파싱 에러:', error);
+        router.push('/auth/login');
+        return;
+      }
+      
+      setIsLoading(false);
+    };
+
+    checkAdminAuth();
+  }, [router]);
+
+  // 로딩 중이거나 권한이 없는 경우
+  if (isLoading) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        fontSize: '18px'
+      }}>
+        권한을 확인하는 중...
+      </div>
+    );
+  }
+
+  if (!isAuthorized) {
+    return null;
+  }
 
   const filteredUsers = recentUsers.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

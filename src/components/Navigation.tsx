@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import styled from 'styled-components';
-import { Search, User, Menu, X, Play, Home, Film, Tv, Heart, Settings, Shield, Mail } from 'lucide-react';
+import { Search, User, Menu, X, Play, Home, Film, Tv, Heart, Settings, Shield, Mail, LogOut } from 'lucide-react';
 import Button from './common/Button';
 import Input from './common/Input';
+import { tokenManager } from '../services/api';
 
 const NavContainer = styled.nav`
   background: linear-gradient(135deg, ${({ theme }) => theme.colors.primary[500]} 0%, ${({ theme }) => theme.colors.primary[600]} 100%);
@@ -205,6 +206,8 @@ export default function Navigation() {
   const router = useRouter();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userInfo, setUserInfo] = useState<{ name: string; email: string } | null>(null);
 
   const navItems = [
     { href: '/', label: '홈', icon: Home },
@@ -214,6 +217,42 @@ export default function Navigation() {
     { href: '/admin', label: '관리자', icon: Shield },
     { href: '/contact', label: '연락처', icon: Mail },
   ];
+
+  // 로그인 상태 확인
+  useEffect(() => {
+    const checkLoginStatus = () => {
+      const token = tokenManager.getToken();
+      if (token) {
+        setIsLoggedIn(true);
+        // localStorage에서 사용자 정보 가져오기 (로그인 시 저장됨)
+        const savedUserInfo = localStorage.getItem('userInfo');
+        if (savedUserInfo) {
+          setUserInfo(JSON.parse(savedUserInfo));
+        }
+      } else {
+        setIsLoggedIn(false);
+        setUserInfo(null);
+      }
+    };
+
+    // 초기 로그인 상태 확인
+    checkLoginStatus();
+
+    // 주기적으로 로그인 상태 확인 (1초마다)
+    const interval = setInterval(checkLoginStatus, 1000);
+
+    // 컴포넌트 언마운트 시 인터벌 정리
+    return () => clearInterval(interval);
+  }, []);
+
+  // 로그아웃 함수
+  const handleLogout = () => {
+    tokenManager.removeToken();
+    localStorage.removeItem('userInfo');
+    setIsLoggedIn(false);
+    setUserInfo(null);
+    router.push('/');
+  };
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
@@ -238,10 +277,23 @@ export default function Navigation() {
           </SearchContainer>
           
           <UserActions>
-            <UserButton onClick={() => router.push('/auth/login')}>
-              <User size={20} />
-              로그인
-            </UserButton>
+            {isLoggedIn ? (
+              <>
+                <UserButton onClick={() => router.push('/mypage')}>
+                  <User size={20} />
+                  {userInfo?.name || '사용자'}
+                </UserButton>
+                <UserButton onClick={handleLogout}>
+                  <LogOut size={20} />
+                  로그아웃
+                </UserButton>
+              </>
+            ) : (
+              <UserButton onClick={() => router.push('/auth/login')}>
+                <User size={20} />
+                로그인
+              </UserButton>
+            )}
             <MobileMenuButton onClick={toggleMobileMenu}>
               {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </MobileMenuButton>

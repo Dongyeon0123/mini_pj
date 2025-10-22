@@ -425,6 +425,17 @@ const ErrorMessage = styled.div`
   border: 1px solid ${({ theme }) => theme.colors.error}40;
 `;
 
+const SuccessMessage = styled.div`
+  background-color: ${({ theme }) => theme.colors.success}20;
+  color: ${({ theme }) => theme.colors.success};
+  padding: ${({ theme }) => theme.spacing[3]} ${({ theme }) => theme.spacing[4]};
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  font-size: ${({ theme }) => theme.fontSizes.sm};
+  font-weight: ${({ theme }) => theme.fontWeights.medium};
+  margin-bottom: ${({ theme }) => theme.spacing[4]};
+  border: 1px solid ${({ theme }) => theme.colors.success}40;
+`;
+
 export default function LoginPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
@@ -435,6 +446,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -449,6 +461,7 @@ export default function LoginPage() {
     console.log('폼 제출됨!', formData);
     setIsLoading(true);
     setError('');
+    setSuccess('');
 
     try {
       // API 호출을 위한 데이터 준비
@@ -457,27 +470,59 @@ export default function LoginPage() {
         password: formData.password,
       };
 
-      console.log('로그인 API 호출:', loginData);
+      console.log('=== 로그인 시도 시작 ===');
+      console.log('입력 데이터:', loginData);
+      console.log('API URL:', 'http://localhost:8080/api/auth/login');
       
       // 백엔드 API 호출
       const response = await authApi.login(loginData);
+      
+      console.log('=== API 응답 받음 ===');
+      console.log('전체 응답:', response);
+      console.log('응답 성공 여부:', response.success);
+      console.log('응답 데이터:', response.data);
       
       if (response.success && response.data) {
         // 토큰 저장
         tokenManager.setToken(response.data.token);
         
-        console.log('로그인 성공! 토큰 저장 완료');
-        console.log('사용자 정보:', response.data);
+        // 사용자 정보 저장
+        const userInfo = {
+          name: response.data.name,
+          email: response.data.email,
+          role: response.data.role
+        };
+        localStorage.setItem('userInfo', JSON.stringify(userInfo));
         
-        // 홈으로 리다이렉트
-        router.push('/');
+        console.log('=== 로그인 성공 ===');
+        console.log('토큰 저장 완료');
+        console.log('사용자 정보 저장 완료:', userInfo);
+        
+        // 성공 메시지 표시
+        setSuccess('로그인에 성공했습니다! 홈으로 이동합니다.');
+        
+        // 1.5초 후 홈으로 리다이렉트
+        setTimeout(() => {
+          router.push('/');
+        }, 1500);
       } else {
+        console.log('=== 로그인 실패 ===');
+        console.log('실패 이유:', response.message);
         setError(response.message || '로그인에 실패했습니다.');
       }
       
     } catch (error: any) {
-      console.error('로그인 API 에러:', error);
-      setError(error.message || '로그인에 실패했습니다. 이메일과 비밀번호를 확인해주세요.');
+      console.error('=== 로그인 API 에러 발생 ===');
+      console.error('에러 타입:', typeof error);
+      console.error('에러 메시지:', error.message);
+      console.error('에러 전체:', error);
+      
+      // 네트워크 에러인지 확인
+      if (error.message.includes('fetch')) {
+        setError('서버에 연결할 수 없습니다. 백엔드 서버가 실행 중인지 확인해주세요.');
+      } else {
+        setError(error.message || '로그인에 실패했습니다. 이메일과 비밀번호를 확인해주세요.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -503,6 +548,7 @@ export default function LoginPage() {
         </Logo>
 
         {error && <ErrorMessage>{error}</ErrorMessage>}
+        {success && <SuccessMessage>{success}</SuccessMessage>}
 
         <Form onSubmit={handleSubmit}>
           <InputGroup>
@@ -554,14 +600,9 @@ export default function LoginPage() {
             </ForgotPassword>
           </OptionsRow>
 
-          <LoginButton 
-            type="button" 
+          <LoginButton
+            type="submit" 
             disabled={isLoading}
-            onClick={() => {
-              console.log('로그인 버튼 클릭됨!');
-              console.log('현재 폼 데이터:', formData);
-              router.push('/');
-            }}
           >
             {isLoading ? '로그인 중...' : '로그인'}
           </LoginButton>

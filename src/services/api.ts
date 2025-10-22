@@ -66,6 +66,10 @@ export const authApi = {
   // 로그인
   login: async (data: LoginRequest): Promise<ApiResponse<LoginResponse>> => {
     try {
+      console.log('=== API 호출 시작 ===');
+      console.log('요청 URL:', `${API_BASE_URL}/auth/login`);
+      console.log('요청 데이터:', data);
+      
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
@@ -74,12 +78,22 @@ export const authApi = {
         body: JSON.stringify(data),
       });
 
+      console.log('=== 백엔드 응답 ===');
+      console.log('응답 상태:', response.status);
+      console.log('응답 OK:', response.ok);
+      console.log('응답 헤더:', response.headers);
+
       const result = await response.json();
+      console.log('응답 데이터:', result);
       
       if (!response.ok) {
+        console.log('=== 로그인 실패 ===');
+        console.log('실패 상태 코드:', response.status);
+        console.log('실패 메시지:', result.message);
         throw new Error(result.message || '로그인에 실패했습니다.');
       }
 
+      console.log('=== 로그인 성공 ===');
       return result;
     } catch (error) {
       console.error('로그인 API 에러:', error);

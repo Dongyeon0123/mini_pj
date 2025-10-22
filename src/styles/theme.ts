@@ -3,6 +3,7 @@ export const theme = {
   colors: {
     // 메인 컬러 - LG U+ 시그니처 분홍색
     primary: {
+      25: '#fef7f9',
       50: '#fdf2f8',
       100: '#fce7f3',
       200: '#fbcfe8',
@@ -16,6 +17,7 @@ export const theme = {
     },
     // 보조 컬러 - 그레이 톤
     gray: {
+      25: '#fcfcfd',
       50: '#f9fafb',
       100: '#f3f4f6',
       200: '#e5e7eb',
@@ -67,6 +69,7 @@ export const theme = {
     4: '1rem',
     5: '1.25rem',
     6: '1.5rem',
+    7: '1.75rem',
     8: '2rem',
     10: '2.5rem',
     12: '3rem',

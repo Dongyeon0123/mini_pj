@@ -156,3 +156,4 @@ export const GlobalStyle = createGlobalStyle`
     animation: slideIn 0.3s ease-out;
   }
 `;
+

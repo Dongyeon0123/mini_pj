@@ -305,7 +305,7 @@ const ActivityList = styled.div`
   gap: ${({ theme }) => theme.spacing[4]};
 `;
 
-const ActivityItem = styled.div`
+const ActivityItem = styled.div<{ $status?: string }>`
   display: flex;
   align-items: center;
   gap: ${({ theme }) => theme.spacing[4]};

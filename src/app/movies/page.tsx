@@ -1,81 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import styled from 'styled-components';
 import { Play, Plus, Star, Filter, Search, Grid, List } from 'lucide-react';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
 import Input from '../../components/common/Input';
-
-// 임시 데이터
-const movies = [
-  {
-    id: 1,
-    title: '오징어 게임 2',
-    genre: '드라마',
-    year: 2024,
-    rating: 9.2,
-    duration: '60분',
-    image: '/오징어게임.jpg',
-  },
-  {
-    id: 2,
-    title: '킹덤',
-    genre: '액션',
-    year: 2023,
-    rating: 8.9,
-    duration: '45분',
-    image: '/킹덤.jpg',
-  },
-  {
-    id: 3,
-    title: '지옥',
-    genre: '공포',
-    year: 2023,
-    rating: 8.5,
-    duration: '50분',
-    image: '/지옥.jpg',
-  },
-  {
-    id: 4,
-    title: '마이 네임',
-    genre: '액션',
-    year: 2023,
-    rating: 8.7,
-    duration: '55분',
-    image: '/마이네임.jpg',
-  },
-  {
-    id: 5,
-    title: '더 글로리',
-    genre: '드라마',
-    year: 2023,
-    rating: 8.8,
-    duration: '50분',
-    image: '/더글로리.jpg',
-  },
-  {
-    id: 6,
-    title: 'D.P.',
-    genre: '드라마',
-    year: 2023,
-    rating: 8.6,
-    duration: '45분',
-    image: '/DP.jpg',
-  },
-  {
-    id: 7,
-    title: '지금 우리 학교는',
-    genre: '코미디',
-    year: 2021,
-    rating: 8.4,
-    duration: '50분',
-    image: '/지우학.jpg',
-  },
-];
-
-const genres = ['전체', '드라마', '액션', '공포', '코미디', '로맨스', '스릴러'];
+import { contentApi, ContentType, GENRES } from '../../services/api';
+import type { Content } from '../../services/api';
 
 const Container = styled.div`
   min-height: 100vh;
@@ -458,6 +391,30 @@ const Rating = styled.div`
   color: ${({ theme }) => theme.colors.warning};
 `;
 
+const LoadingMessage = styled.div`
+  text-align: center;
+  padding: ${({ theme }) => theme.spacing[16]};
+  font-size: ${({ theme }) => theme.fontSizes.xl};
+  color: ${({ theme }) => theme.colors.gray[600]};
+`;
+
+const ErrorMessage = styled.div`
+  text-align: center;
+  padding: ${({ theme }) => theme.spacing[16]};
+  font-size: ${({ theme }) => theme.fontSizes.xl};
+  color: ${({ theme }) => theme.colors.error};
+  background-color: ${({ theme }) => theme.colors.error}10;
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  margin: ${({ theme }) => theme.spacing[8]} 0;
+`;
+
+const EmptyMessage = styled.div`
+  text-align: center;
+  padding: ${({ theme }) => theme.spacing[16]};
+  font-size: ${({ theme }) => theme.fontSizes.xl};
+  color: ${({ theme }) => theme.colors.gray[500]};
+`;
+
 const Pagination = styled.div`
   display: flex;
   justify-content: center;
@@ -499,13 +456,51 @@ export default function MoviesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGenre, setSelectedGenre] = useState('전체');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [movies, setMovies] = useState<Content[]>([]);
+  const [totalPages, setTotalPages] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const filteredMovies = movies.filter(movie => {
-    const matchesSearch = movie.title.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesGenre = selectedGenre === '전체' || movie.genre === selectedGenre;
-    return matchesSearch && matchesGenre;
-  });
+  // 콘텐츠 목록 불러오기
+  useEffect(() => {
+    const fetchMovies = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await contentApi.getContents({
+          contentType: ContentType.MOVIE,
+          genre: selectedGenre,
+          keyword: searchQuery,
+          page: currentPage,
+          size: 20,
+        });
+
+        if (response.success && response.data) {
+          setMovies(response.data.contents);
+          setTotalPages(response.data.pageInfo.totalPages);
+        }
+      } catch (err) {
+        console.error('영화 목록 조회 실패:', err);
+        setError('영화 목록을 불러오는데 실패했습니다.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // 검색어가 변경되면 첫 페이지로 이동
+    if (searchQuery) {
+      const timeoutId = setTimeout(() => {
+        setCurrentPage(0);
+        fetchMovies();
+      }, 500); // 500ms 디바운싱
+
+      return () => clearTimeout(timeoutId);
+    } else {
+      fetchMovies();
+    }
+  }, [selectedGenre, currentPage, searchQuery]);
 
   const handlePlay = (movieId: number) => {
     console.log('재생 시작:', movieId);
@@ -513,6 +508,11 @@ export default function MoviesPage() {
 
   const handleAddToWatchlist = (movieId: number) => {
     console.log('찜 목록에 추가:', movieId);
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
@@ -536,11 +536,14 @@ export default function MoviesPage() {
         <FilterSection>
           <FilterGroup>
             <GenreFilter>
-              {genres.map((genre) => (
+              {GENRES.map((genre) => (
                 <GenreButton
                   key={genre}
                   $active={selectedGenre === genre}
-                  onClick={() => setSelectedGenre(genre)}
+                  onClick={() => {
+                    setSelectedGenre(genre);
+                    setCurrentPage(0);
+                  }}
                 >
                   {genre}
                 </GenreButton>
@@ -566,8 +569,21 @@ export default function MoviesPage() {
           </ViewToggle>
         </FilterSection>
 
-        <MoviesGrid $view={viewMode}>
-          {filteredMovies.map((movie) => (
+        {loading && (
+          <LoadingMessage>영화 목록을 불러오는 중...</LoadingMessage>
+        )}
+
+        {error && (
+          <ErrorMessage>{error}</ErrorMessage>
+        )}
+
+        {!loading && !error && movies.length === 0 && (
+          <EmptyMessage>검색 결과가 없습니다.</EmptyMessage>
+        )}
+
+        {!loading && !error && movies.length > 0 && (
+          <MoviesGrid $view={viewMode}>
+            {movies.map((movie) => (
             <Link key={movie.id} href={`/movies/${movie.id}`}>
               <MovieCard $view={viewMode} hover>
                 <MovieImage $image={movie.image} $view={viewMode}>
@@ -609,32 +625,50 @@ export default function MoviesPage() {
                 </MovieInfo>
               </MovieCard>
             </Link>
-          ))}
-        </MoviesGrid>
+            ))}
+          </MoviesGrid>
+        )}
 
-        <Pagination>
-          <PageButton
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage(currentPage - 1)}
-          >
-            이전
-          </PageButton>
-          <PageButton $active={currentPage === 1} onClick={() => setCurrentPage(1)}>
-            1
-          </PageButton>
-          <PageButton $active={currentPage === 2} onClick={() => setCurrentPage(2)}>
-            2
-          </PageButton>
-          <PageButton $active={currentPage === 3} onClick={() => setCurrentPage(3)}>
-            3
-          </PageButton>
-          <PageButton
-            disabled={currentPage === 3}
-            onClick={() => setCurrentPage(currentPage + 1)}
-          >
-            다음
-          </PageButton>
-        </Pagination>
+        {!loading && !error && totalPages > 1 && (
+          <Pagination>
+            <PageButton
+              disabled={currentPage === 0}
+              onClick={() => handlePageChange(currentPage - 1)}
+            >
+              이전
+            </PageButton>
+            
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              let pageNum;
+              if (totalPages <= 5) {
+                pageNum = i;
+              } else if (currentPage < 3) {
+                pageNum = i;
+              } else if (currentPage > totalPages - 4) {
+                pageNum = totalPages - 5 + i;
+              } else {
+                pageNum = currentPage - 2 + i;
+              }
+
+              return (
+                <PageButton
+                  key={pageNum}
+                  $active={currentPage === pageNum}
+                  onClick={() => handlePageChange(pageNum)}
+                >
+                  {pageNum + 1}
+                </PageButton>
+              );
+            })}
+            
+            <PageButton
+              disabled={currentPage === totalPages - 1}
+              onClick={() => handlePageChange(currentPage + 1)}
+            >
+              다음
+            </PageButton>
+          </Pagination>
+        )}
       </Content>
     </Container>
   );

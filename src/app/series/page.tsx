@@ -1,98 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import styled from 'styled-components';
 import { Play, Plus, Star, Filter, Grid, List, Tv } from 'lucide-react';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
 import Input from '../../components/common/Input';
-
-// 임시 데이터
-const series = [
-  {
-    id: 1,
-    title: '오징어 게임',
-    genre: '드라마',
-    year: 2021,
-    rating: 9.2,
-    episodes: 9,
-    seasons: 1,
-    image: '/오징어게임.jpg',
-  },
-  {
-    id: 2,
-    title: '킹덤',
-    genre: '액션',
-    year: 2019,
-    rating: 8.9,
-    episodes: 12,
-    seasons: 2,
-    image: '/킹덤.jpg',
-  },
-  {
-    id: 3,
-    title: '지옥',
-    genre: '공포',
-    year: 2021,
-    rating: 8.5,
-    episodes: 6,
-    seasons: 1,
-    image: '/지옥.jpg',
-  },
-  {
-    id: 4,
-    title: '마이 네임',
-    genre: '액션',
-    year: 2021,
-    rating: 8.7,
-    episodes: 8,
-    seasons: 1,
-    image: '/마이네임.jpg',
-  },
-  {
-    id: 5,
-    title: '스위트홈',
-    genre: '공포',
-    year: 2020,
-    rating: 8.3,
-    episodes: 10,
-    seasons: 1,
-    image: '/스위트홈.jpg',
-  },
-  {
-    id: 6,
-    title: '더 글로리',
-    genre: '드라마',
-    year: 2022,
-    rating: 8.8,
-    episodes: 8,
-    seasons: 1,
-    image: '/더글로리.jpg',
-  },
-  {
-    id: 7,
-    title: 'D.P.',
-    genre: '드라마',
-    year: 2021,
-    rating: 8.6,
-    episodes: 6,
-    seasons: 1,
-    image: '/DP.jpg',
-  },
-  {
-    id: 8,
-    title: '지금 우리 학교는',
-    genre: '공포',
-    year: 2022,
-    rating: 8.4,
-    episodes: 12,
-    seasons: 1,
-    image: '/지우학.jpg',
-  },
-];
-
-const genres = ['전체', '드라마', '액션', '공포', '코미디', '로맨스', '스릴러'];
+import { contentApi, ContentType, GENRES } from '../../services/api';
+import type { Content } from '../../services/api';
 
 const Container = styled.div`
   min-height: 100vh;
@@ -439,6 +355,30 @@ const SeasonInfo = styled.div`
   font-weight: ${({ theme }) => theme.fontWeights.medium};
 `;
 
+const LoadingMessage = styled.div`
+  text-align: center;
+  padding: ${({ theme }) => theme.spacing[16]};
+  font-size: ${({ theme }) => theme.fontSizes.xl};
+  color: ${({ theme }) => theme.colors.gray[600]};
+`;
+
+const ErrorMessage = styled.div`
+  text-align: center;
+  padding: ${({ theme }) => theme.spacing[16]};
+  font-size: ${({ theme }) => theme.fontSizes.xl};
+  color: ${({ theme }) => theme.colors.error};
+  background-color: ${({ theme }) => theme.colors.error}10;
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  margin: ${({ theme }) => theme.spacing[8]} 0;
+`;
+
+const EmptyMessage = styled.div`
+  text-align: center;
+  padding: ${({ theme }) => theme.spacing[16]};
+  font-size: ${({ theme }) => theme.fontSizes.xl};
+  color: ${({ theme }) => theme.colors.gray[500]};
+`;
+
 const Pagination = styled.div`
   display: flex;
   justify-content: center;
@@ -480,13 +420,51 @@ export default function SeriesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGenre, setSelectedGenre] = useState('전체');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [series, setSeries] = useState<Content[]>([]);
+  const [totalPages, setTotalPages] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const filteredSeries = series.filter(series => {
-    const matchesSearch = series.title.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesGenre = selectedGenre === '전체' || series.genre === selectedGenre;
-    return matchesSearch && matchesGenre;
-  });
+  // 콘텐츠 목록 불러오기
+  useEffect(() => {
+    const fetchSeries = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await contentApi.getContents({
+          contentType: ContentType.SERIES,
+          genre: selectedGenre,
+          keyword: searchQuery,
+          page: currentPage,
+          size: 20,
+        });
+
+        if (response.success && response.data) {
+          setSeries(response.data.contents);
+          setTotalPages(response.data.pageInfo.totalPages);
+        }
+      } catch (err) {
+        console.error('시리즈 목록 조회 실패:', err);
+        setError('시리즈 목록을 불러오는데 실패했습니다.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // 검색어가 변경되면 첫 페이지로 이동
+    if (searchQuery) {
+      const timeoutId = setTimeout(() => {
+        setCurrentPage(0);
+        fetchSeries();
+      }, 500); // 500ms 디바운싱
+
+      return () => clearTimeout(timeoutId);
+    } else {
+      fetchSeries();
+    }
+  }, [selectedGenre, currentPage, searchQuery]);
 
   const handlePlay = (seriesId: number) => {
     console.log('재생 시작:', seriesId);
@@ -494,6 +472,11 @@ export default function SeriesPage() {
 
   const handleAddToWatchlist = (seriesId: number) => {
     console.log('찜 목록에 추가:', seriesId);
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
@@ -517,11 +500,14 @@ export default function SeriesPage() {
         <FilterSection>
           <FilterGroup>
             <GenreFilter>
-              {genres.map((genre) => (
+              {GENRES.map((genre) => (
                 <GenreButton
                   key={genre}
                   $active={selectedGenre === genre}
-                  onClick={() => setSelectedGenre(genre)}
+                  onClick={() => {
+                    setSelectedGenre(genre);
+                    setCurrentPage(0);
+                  }}
                 >
                   {genre}
                 </GenreButton>
@@ -547,78 +533,111 @@ export default function SeriesPage() {
           </ViewToggle>
         </FilterSection>
 
-        <SeriesGrid $view={viewMode}>
-          {filteredSeries.map((series) => (
-            <Link key={series.id} href={`/series/${series.id}`}>
+        {loading && (
+          <LoadingMessage>시리즈 목록을 불러오는 중...</LoadingMessage>
+        )}
+
+        {error && (
+          <ErrorMessage>{error}</ErrorMessage>
+        )}
+
+        {!loading && !error && series.length === 0 && (
+          <EmptyMessage>검색 결과가 없습니다.</EmptyMessage>
+        )}
+
+        {!loading && !error && series.length > 0 && (
+          <SeriesGrid $view={viewMode}>
+            {series.map((seriesItem) => (
+            <Link key={seriesItem.id} href={`/series/${seriesItem.id}`}>
               <SeriesCard $view={viewMode} hover>
-                <SeriesImage $image={series.image} $view={viewMode}>
+                <SeriesImage $image={seriesItem.image} $view={viewMode}>
                   <SeriesOverlay>
                     <OverlayContent>
                       <PlayIcon onClick={(e) => {
                         e.preventDefault();
-                        handlePlay(series.id);
+                        handlePlay(seriesItem.id);
                       }}>
                         <Play size={20} fill="currentColor" />
                       </PlayIcon>
                       <div style={{ flex: 1 }}>
                         <SeriesTitle style={{ color: '#1a1a1a', marginBottom: '4px', fontSize: '16px' }}>
-                          {series.title}
+                          {seriesItem.title}
                         </SeriesTitle>
                         <SeriesMeta style={{ color: '#666', fontSize: '12px' }}>
                           <Rating>
                             <Star size={14} fill="currentColor" />
-                            {series.rating}
+                            {seriesItem.rating}
                           </Rating>
-                          <span>{series.year}</span>
-                          <span>{series.genre}</span>
+                          <span>{seriesItem.year}</span>
+                          <span>{seriesItem.genre}</span>
                         </SeriesMeta>
                       </div>
                     </OverlayContent>
                   </SeriesOverlay>
                 </SeriesImage>
                 <SeriesInfo $view={viewMode}>
-                  <SeriesTitle>{series.title}</SeriesTitle>
+                  <SeriesTitle>{seriesItem.title}</SeriesTitle>
                   <SeriesMeta>
                     <Rating>
                       <Star size={16} fill="currentColor" />
-                      {series.rating}
+                      {seriesItem.rating}
                     </Rating>
-                    <span>{series.year}</span>
-                    <span>{series.genre}</span>
-                    <SeasonInfo>
-                      <Tv size={16} />
-                      {series.seasons}시즌 {series.episodes}화
-                    </SeasonInfo>
+                    <span>{seriesItem.year}</span>
+                    <span>{seriesItem.genre}</span>
+                    {seriesItem.seasons && seriesItem.episodes && (
+                      <SeasonInfo>
+                        <Tv size={16} />
+                        {seriesItem.seasons}시즌 {seriesItem.episodes}화
+                      </SeasonInfo>
+                    )}
                   </SeriesMeta>
                 </SeriesInfo>
               </SeriesCard>
             </Link>
-          ))}
-        </SeriesGrid>
+            ))}
+          </SeriesGrid>
+        )}
 
-        <Pagination>
-          <PageButton
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage(currentPage - 1)}
-          >
-            이전
-          </PageButton>
-          <PageButton $active={currentPage === 1} onClick={() => setCurrentPage(1)}>
-            1
-          </PageButton>
-          <PageButton $active={currentPage === 2} onClick={() => setCurrentPage(2)}>
-            2
-          </PageButton>
-          <PageButton $active={currentPage === 3} onClick={() => setCurrentPage(3)}>
-            3
-          </PageButton>
-          <PageButton
-            disabled={currentPage === 3}
-            onClick={() => setCurrentPage(currentPage + 1)}
-          >
-            다음
-          </PageButton>
-        </Pagination>
+        {!loading && !error && totalPages > 1 && (
+          <Pagination>
+            <PageButton
+              disabled={currentPage === 0}
+              onClick={() => handlePageChange(currentPage - 1)}
+            >
+              이전
+            </PageButton>
+            
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              let pageNum;
+              if (totalPages <= 5) {
+                pageNum = i;
+              } else if (currentPage < 3) {
+                pageNum = i;
+              } else if (currentPage > totalPages - 4) {
+                pageNum = totalPages - 5 + i;
+              } else {
+                pageNum = currentPage - 2 + i;
+              }
+
+              return (
+                <PageButton
+                  key={pageNum}
+                  $active={currentPage === pageNum}
+                  onClick={() => handlePageChange(pageNum)}
+                >
+                  {pageNum + 1}
+                </PageButton>
+              );
+            })}
+            
+            <PageButton
+              disabled={currentPage === totalPages - 1}
+              onClick={() => handlePageChange(currentPage + 1)}
+            >
+              다음
+            </PageButton>
+          </Pagination>
+        )}
       </Content>
     </Container>
   );

@@ -128,3 +128,299 @@ export const tokenManager = {
     };
   },
 };
+
+// ============================================
+// 콘텐츠 관련 타입 정의
+// ============================================
+
+// 콘텐츠 타입
+export enum ContentType {
+  MOVIE = 'MOVIE',
+  SERIES = 'SERIES',
+}
+
+// 콘텐츠 기본 정보
+export interface Content {
+  id: number;
+  title: string;
+  description?: string;
+  genre: string;
+  year: number;
+  rating: number;
+  duration?: string; // 영화의 경우 "120분"
+  episodes?: number; // 시리즈의 경우
+  seasons?: number; // 시리즈의 경우
+  image: string;
+  thumbnailUrl?: string;
+  contentType: ContentType;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// 콘텐츠 상세 정보
+export interface ContentDetail extends Content {
+  trailerUrl?: string;
+  videoUrl?: string;
+  director?: string;
+  cast?: string[];
+  ageRating?: string;
+  releaseDate?: string;
+  country?: string;
+  language?: string;
+  tags?: string[];
+  viewCount?: number;
+  likeCount?: number;
+}
+
+// 콘텐츠 필터 조건
+export interface ContentFilter {
+  contentType?: ContentType;
+  genre?: string;
+  keyword?: string;
+  sortBy?: 'latest' | 'rating' | 'popular' | 'title';
+  page?: number;
+  size?: number;
+}
+
+// 페이징 정보
+export interface PageInfo {
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
+// 콘텐츠 목록 응답
+export interface ContentListResponse {
+  contents: Content[];
+  pageInfo: PageInfo;
+}
+
+// 장르 목록
+export const GENRES = [
+  '전체',
+  '드라마',
+  '액션',
+  '공포',
+  '코미디',
+  '로맨스',
+  '스릴러',
+  '판타지',
+  'SF',
+  '다큐멘터리',
+];
+
+// ============================================
+// 콘텐츠 API
+// ============================================
+
+export const contentApi = {
+  // 콘텐츠 목록 조회 (필터링, 검색, 페이징)
+  getContents: async (
+    filter: ContentFilter
+  ): Promise<ApiResponse<ContentListResponse>> => {
+    try {
+      const params = new URLSearchParams();
+      
+      if (filter.contentType) params.append('contentType', filter.contentType);
+      if (filter.genre && filter.genre !== '전체') params.append('genre', filter.genre);
+      if (filter.keyword) params.append('keyword', filter.keyword);
+      if (filter.sortBy) params.append('sortBy', filter.sortBy);
+      params.append('page', (filter.page || 0).toString());
+      params.append('size', (filter.size || 20).toString());
+
+      const response = await fetch(
+        `${API_BASE_URL}/contents?${params.toString()}`,
+        {
+          method: 'GET',
+          headers: tokenManager.getAuthHeaders(),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || '콘텐츠 목록 조회에 실패했습니다.');
+      }
+
+      return result;
+    } catch (error) {
+      console.error('콘텐츠 목록 조회 API 에러:', error);
+      throw error;
+    }
+  },
+
+  // 콘텐츠 상세 조회
+  getContentById: async (
+    id: number
+  ): Promise<ApiResponse<ContentDetail>> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/contents/${id}`, {
+        method: 'GET',
+        headers: tokenManager.getAuthHeaders(),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || '콘텐츠 조회에 실패했습니다.');
+      }
+
+      return result;
+    } catch (error) {
+      console.error('콘텐츠 상세 조회 API 에러:', error);
+      throw error;
+    }
+  },
+
+  // 추천 콘텐츠 조회
+  getRecommendedContents: async (
+    limit: number = 10
+  ): Promise<ApiResponse<Content[]>> => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/contents/recommended?limit=${limit}`,
+        {
+          method: 'GET',
+          headers: tokenManager.getAuthHeaders(),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || '추천 콘텐츠 조회에 실패했습니다.');
+      }
+
+      return result;
+    } catch (error) {
+      console.error('추천 콘텐츠 조회 API 에러:', error);
+      throw error;
+    }
+  },
+
+  // 인기 콘텐츠 조회
+  getPopularContents: async (
+    contentType?: ContentType,
+    limit: number = 10
+  ): Promise<ApiResponse<Content[]>> => {
+    try {
+      const params = new URLSearchParams();
+      if (contentType) params.append('contentType', contentType);
+      params.append('limit', limit.toString());
+
+      const response = await fetch(
+        `${API_BASE_URL}/contents/popular?${params.toString()}`,
+        {
+          method: 'GET',
+          headers: tokenManager.getAuthHeaders(),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || '인기 콘텐츠 조회에 실패했습니다.');
+      }
+
+      return result;
+    } catch (error) {
+      console.error('인기 콘텐츠 조회 API 에러:', error);
+      throw error;
+    }
+  },
+
+  // 최신 콘텐츠 조회
+  getLatestContents: async (
+    contentType?: ContentType,
+    limit: number = 10
+  ): Promise<ApiResponse<Content[]>> => {
+    try {
+      const params = new URLSearchParams();
+      if (contentType) params.append('contentType', contentType);
+      params.append('limit', limit.toString());
+
+      const response = await fetch(
+        `${API_BASE_URL}/contents/latest?${params.toString()}`,
+        {
+          method: 'GET',
+          headers: tokenManager.getAuthHeaders(),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || '최신 콘텐츠 조회에 실패했습니다.');
+      }
+
+      return result;
+    } catch (error) {
+      console.error('최신 콘텐츠 조회 API 에러:', error);
+      throw error;
+    }
+  },
+
+  // 장르별 콘텐츠 조회
+  getContentsByGenre: async (
+    genre: string,
+    page: number = 0,
+    size: number = 20
+  ): Promise<ApiResponse<ContentListResponse>> => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/contents/genre/${genre}?page=${page}&size=${size}`,
+        {
+          method: 'GET',
+          headers: tokenManager.getAuthHeaders(),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || '장르별 콘텐츠 조회에 실패했습니다.');
+      }
+
+      return result;
+    } catch (error) {
+      console.error('장르별 콘텐츠 조회 API 에러:', error);
+      throw error;
+    }
+  },
+
+  // 콘텐츠 검색
+  searchContents: async (
+    keyword: string,
+    contentType?: ContentType,
+    page: number = 0,
+    size: number = 20
+  ): Promise<ApiResponse<ContentListResponse>> => {
+    try {
+      const params = new URLSearchParams();
+      params.append('keyword', keyword);
+      if (contentType) params.append('contentType', contentType);
+      params.append('page', page.toString());
+      params.append('size', size.toString());
+
+      const response = await fetch(
+        `${API_BASE_URL}/contents/search?${params.toString()}`,
+        {
+          method: 'GET',
+          headers: tokenManager.getAuthHeaders(),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || '콘텐츠 검색에 실패했습니다.');
+      }
+
+      return result;
+    } catch (error) {
+      console.error('콘텐츠 검색 API 에러:', error);
+      throw error;
+    }
+  },
+};

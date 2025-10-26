@@ -1,67 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import Link from 'next/link';
 import { Play, Plus, Star, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import Button from '../components/common/Button';
 import Card from '../components/common/Card';
-
-// 임시 데이터
-const featuredContent = {
-  id: 1,
-  title: '오징어 게임 2',
-  description: '세계적인 화제를 불러일으킨 오징어 게임의 속편. 더욱 치열해진 생존 게임이 시작된다.',
-  genre: '드라마',
-  year: 2024,
-  rating: 9.2,
-  duration: '60분',
-  image: '/오징어게임.jpg',
-  trailer: 'https://www.youtube.com/watch?v=example',
-};
-
-const recommendedContent = [
-  {
-    id: 1,
-    title: '킹덤',
-    genre: '액션',
-    year: 2023,
-    rating: 8.9,
-    image: '/킹덤.jpg',
-  },
-  {
-    id: 2,
-    title: '지옥',
-    genre: '공포',
-    year: 2023,
-    rating: 8.5,
-    image: '/지옥.jpg',
-  },
-  {
-    id: 3,
-    title: '마이 네임',
-    genre: '액션',
-    year: 2023,
-    rating: 8.7,
-    image: '/마이네임.jpg',
-  },
-  {
-    id: 4,
-    title: '더 글로리',
-    genre: '드라마',
-    year: 2023,
-    rating: 8.8,
-    image: '/더글로리.jpg',
-  },
-  {
-    id: 5,
-    title: '오징어 게임',
-    genre: '드라마',
-    year: 2021,
-    rating: 9.2,
-    image: '/오징어게임.jpg',
-  },
-];
+import { contentApi } from '../services/api';
+import type { Content, ContentDetail } from '../services/api';
 
 const HeroSection = styled.section`
   position: relative;
@@ -385,8 +331,83 @@ const Rating = styled.div`
   color: ${({ theme }) => theme.colors.warning};
 `;
 
+const LoadingContainer = styled.div`
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: ${({ theme }) => theme.colors.gray[50]};
+`;
+
+const LoadingMessage = styled.div`
+  text-align: center;
+  font-size: ${({ theme }) => theme.fontSizes['2xl']};
+  color: ${({ theme }) => theme.colors.gray[600]};
+`;
+
+const ErrorContainer = styled.div`
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: ${({ theme }) => theme.colors.gray[50]};
+`;
+
+const ErrorMessage = styled.div`
+  text-align: center;
+  padding: ${({ theme }) => theme.spacing[16]};
+  font-size: ${({ theme }) => theme.fontSizes['2xl']};
+  color: ${({ theme }) => theme.colors.error};
+  background-color: ${({ theme }) => theme.colors.error}10;
+  border-radius: ${({ theme }) => theme.borderRadius.xl};
+`;
+
+const EmptyMessage = styled.div`
+  text-align: center;
+  padding: ${({ theme }) => theme.spacing[16]};
+  font-size: ${({ theme }) => theme.fontSizes.xl};
+  color: ${({ theme }) => theme.colors.gray[500]};
+`;
+
 export default function Home() {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [featuredContent, setFeaturedContent] = useState<ContentDetail | null>(null);
+  const [recommendedContent, setRecommendedContent] = useState<Content[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // 추천 콘텐츠와 인기 콘텐츠 불러오기
+  useEffect(() => {
+    const fetchContents = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // 인기 콘텐츠 중 첫 번째를 featured로 사용
+        const popularResponse = await contentApi.getPopularContents(undefined, 1);
+        if (popularResponse.success && popularResponse.data && popularResponse.data.length > 0) {
+          const featuredId = popularResponse.data[0].id;
+          const detailResponse = await contentApi.getContentById(featuredId);
+          if (detailResponse.success && detailResponse.data) {
+            setFeaturedContent(detailResponse.data);
+          }
+        }
+
+        // 추천 콘텐츠 가져오기
+        const recommendedResponse = await contentApi.getRecommendedContents(10);
+        if (recommendedResponse.success && recommendedResponse.data) {
+          setRecommendedContent(recommendedResponse.data);
+        }
+      } catch (err) {
+        console.error('콘텐츠 조회 실패:', err);
+        setError('콘텐츠를 불러오는데 실패했습니다.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchContents();
+  }, []);
 
   const handlePlay = () => {
     setIsPlaying(true);
@@ -398,6 +419,22 @@ export default function Home() {
     // 실제로는 찜 목록에 추가
     console.log('찜 목록에 추가');
   };
+
+  if (loading) {
+    return (
+      <LoadingContainer>
+        <LoadingMessage>콘텐츠를 불러오는 중...</LoadingMessage>
+      </LoadingContainer>
+    );
+  }
+
+  if (error || !featuredContent) {
+    return (
+      <ErrorContainer>
+        <ErrorMessage>{error || '콘텐츠를 불러올 수 없습니다.'}</ErrorMessage>
+      </ErrorContainer>
+    );
+  }
 
   return (
     <>
@@ -420,7 +457,7 @@ export default function Home() {
             <MetaItem>{featuredContent.genre}</MetaItem>
           </HeroMeta>
           <HeroActions>
-            <Link href="/movies/1">
+            <Link href={`/${featuredContent.contentType === 'MOVIE' ? 'movies' : 'series'}/${featuredContent.id}`}>
               <PlayButton>
                 <Play size={24} fill="currentColor" />
                 재생
@@ -437,47 +474,59 @@ export default function Home() {
       <ContentSection>
         <Container>
           <SectionTitle>추천 콘텐츠</SectionTitle>
-          <ContentGrid>
-            {recommendedContent.map((content) => (
-              <ContentCard key={content.id} hover>
-                <ContentImage $image={content.image}>
-                  <ContentOverlay>
-                    <OverlayContent>
-                      <PlayIcon onClick={handlePlay}>
-                        <Play size={20} fill="currentColor" />
-                      </PlayIcon>
-                      <div style={{ flex: 1 }}>
-                        <ContentTitle style={{ color: '#1a1a1a', marginBottom: '4px', fontSize: '16px' }}>
-                          {content.title}
-                        </ContentTitle>
-                        <ContentMeta style={{ color: '#666', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
-                          <Rating>
-                            <Star size={14} fill="currentColor" />
-                            {content.rating}
-                          </Rating>
-                          <span>{content.year}</span>
-                        </ContentMeta>
-                        <div style={{ color: '#666', fontSize: '11px' }}>
-                          {content.genre}
-                        </div>
-                      </div>
-                    </OverlayContent>
-                  </ContentOverlay>
-                </ContentImage>
-                <ContentInfo>
-                  <ContentTitle>{content.title}</ContentTitle>
-                  <ContentMeta>
-                    <Rating>
-                      <Star size={16} fill="currentColor" />
-                      {content.rating}
-                    </Rating>
-                    <span>{content.year}</span>
-                    <span>{content.genre}</span>
-                  </ContentMeta>
-                </ContentInfo>
-              </ContentCard>
-            ))}
-          </ContentGrid>
+          {recommendedContent.length === 0 ? (
+            <EmptyMessage>추천 콘텐츠가 없습니다.</EmptyMessage>
+          ) : (
+            <ContentGrid>
+              {recommendedContent.map((content) => (
+                <Link 
+                  key={content.id} 
+                  href={`/${content.contentType === 'MOVIE' ? 'movies' : 'series'}/${content.id}`}
+                >
+                  <ContentCard hover>
+                    <ContentImage $image={content.image}>
+                      <ContentOverlay>
+                        <OverlayContent>
+                          <PlayIcon onClick={(e) => {
+                            e.preventDefault();
+                            handlePlay();
+                          }}>
+                            <Play size={20} fill="currentColor" />
+                          </PlayIcon>
+                          <div style={{ flex: 1 }}>
+                            <ContentTitle style={{ color: '#1a1a1a', marginBottom: '4px', fontSize: '16px' }}>
+                              {content.title}
+                            </ContentTitle>
+                            <ContentMeta style={{ color: '#666', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                              <Rating>
+                                <Star size={14} fill="currentColor" />
+                                {content.rating}
+                              </Rating>
+                              <span>{content.year}</span>
+                            </ContentMeta>
+                            <div style={{ color: '#666', fontSize: '11px' }}>
+                              {content.genre}
+                            </div>
+                          </div>
+                        </OverlayContent>
+                      </ContentOverlay>
+                    </ContentImage>
+                    <ContentInfo>
+                      <ContentTitle>{content.title}</ContentTitle>
+                      <ContentMeta>
+                        <Rating>
+                          <Star size={16} fill="currentColor" />
+                          {content.rating}
+                        </Rating>
+                        <span>{content.year}</span>
+                        <span>{content.genre}</span>
+                      </ContentMeta>
+                    </ContentInfo>
+                  </ContentCard>
+                </Link>
+              ))}
+            </ContentGrid>
+          )}
         </Container>
       </ContentSection>
     </>

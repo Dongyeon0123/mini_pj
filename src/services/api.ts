@@ -780,3 +780,102 @@ export const watchHistoryApi = {
     }
   },
 };
+
+// ==================== User API ====================
+export interface UserProfile {
+  id: number;
+  email: string;
+  name: string;
+  phoneNumber: string;
+  role: string;
+  createdAt: string;
+}
+
+export interface UpdateProfileRequest {
+  name: string;
+  phoneNumber: string;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export const userApi = {
+  // 프로필 조회
+  getUserProfile: async (userId: number): Promise<ApiResponse<UserProfile>> => {
+    try {
+      const url = `${API_BASE_URL}/users/${userId}`;
+      console.log('🔍 프로필 조회 API 요청:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: tokenManager.getAuthHeaders(),
+      });
+
+      console.log('📡 응답 상태:', response.status, response.statusText);
+      
+      return await handleApiResponse<UserProfile>(
+        response,
+        '프로필 조회에 실패했습니다.'
+      );
+    } catch (error) {
+      console.error('❌ 프로필 조회 API 에러:', error);
+      throw error;
+    }
+  },
+
+  // 프로필 수정
+  updateProfile: async (
+    userId: number,
+    request: UpdateProfileRequest
+  ): Promise<ApiResponse<UserProfile>> => {
+    try {
+      const url = `${API_BASE_URL}/users/${userId}`;
+      console.log('✏️ 프로필 수정 API 요청:', url, request);
+
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: tokenManager.getAuthHeaders(),
+        body: JSON.stringify(request),
+      });
+
+      console.log('📡 응답 상태:', response.status, response.statusText);
+      
+      return await handleApiResponse<UserProfile>(
+        response,
+        '프로필 수정에 실패했습니다.'
+      );
+    } catch (error) {
+      console.error('❌ 프로필 수정 API 에러:', error);
+      throw error;
+    }
+  },
+
+  // 비밀번호 변경
+  changePassword: async (
+    userId: number,
+    request: ChangePasswordRequest
+  ): Promise<ApiResponse<string>> => {
+    try {
+      const url = `${API_BASE_URL}/users/${userId}/password`;
+      console.log('🔐 비밀번호 변경 API 요청:', url);
+
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: tokenManager.getAuthHeaders(),
+        body: JSON.stringify(request),
+      });
+
+      console.log('📡 응답 상태:', response.status, response.statusText);
+      
+      return await handleApiResponse<string>(
+        response,
+        '비밀번호 변경에 실패했습니다.'
+      );
+    } catch (error) {
+      console.error('❌ 비밀번호 변경 API 에러:', error);
+      throw error;
+    }
+  },
+};

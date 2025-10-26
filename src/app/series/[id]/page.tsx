@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import styled from 'styled-components';
-import { Play, Plus, Download, Share2, Star, Clock, Calendar, ChevronLeft } from 'lucide-react';
+import { Play, Plus, Download, Share2, Star, Clock, Calendar, Tv, ChevronLeft } from 'lucide-react';
 import Button from '../../../components/common/Button';
 import { contentApi } from '../../../services/api';
 import type { ContentDetail } from '../../../services/api';
@@ -189,21 +189,21 @@ const ErrorContainer = styled.div`
   gap: ${({ theme }) => theme.spacing[4]};
 `;
 
-export default function MovieDetailPage() {
+export default function SeriesDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const [movie, setMovie] = useState<ContentDetail | null>(null);
+  const [series, setSeries] = useState<ContentDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchMovie = async () => {
+    const fetchSeries = async () => {
       try {
         setLoading(true);
         setError(null);
 
         if (!params?.id) {
-          setError('잘못된 영화 ID입니다.');
+          setError('잘못된 시리즈 ID입니다.');
           return;
         }
 
@@ -211,70 +211,70 @@ export default function MovieDetailPage() {
         const response = await contentApi.getContentById(id);
 
         if (response.success && response.data) {
-          setMovie(response.data);
+          setSeries(response.data);
         }
       } catch (err) {
-        console.error('영화 조회 실패:', err);
-        setError('영화 정보를 불러오는데 실패했습니다.');
+        console.error('시리즈 조회 실패:', err);
+        setError('시리즈 정보를 불러오는데 실패했습니다.');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchMovie();
+    fetchSeries();
   }, [params]);
 
   if (loading) {
     return (
       <LoadingContainer>
-        <p>영화 정보를 불러오는 중...</p>
+        <p>시리즈 정보를 불러오는 중...</p>
       </LoadingContainer>
     );
   }
 
-  if (error || !movie) {
+  if (error || !series) {
     return (
       <ErrorContainer>
-        <p>{error || '영화를 찾을 수 없습니다.'}</p>
-        <Button onClick={() => router.push('/movies')}>목록으로 돌아가기</Button>
+        <p>{error || '시리즈를 찾을 수 없습니다.'}</p>
+        <Button onClick={() => router.push('/series')}>목록으로 돌아가기</Button>
       </ErrorContainer>
     );
   }
 
   return (
     <Container>
-      <HeroSection $image={movie.image}>
+      <HeroSection $image={series.image}>
         <HeroContent>
           <BackButton onClick={() => router.back()}>
             <ChevronLeft size={20} />
             뒤로가기
           </BackButton>
           
-          <Title>{movie.title}</Title>
+          <Title>{series.title}</Title>
           
           <MetaInfo>
             <Rating>
               <Star size={24} fill="currentColor" />
-              {movie.rating}
+              {series.rating}
             </Rating>
             <MetaItem>
               <Calendar size={20} />
-              {movie.year}
+              {series.year}
             </MetaItem>
-            {movie.duration && (
+            {series.seasons && series.episodes && (
               <MetaItem>
-                <Clock size={20} />
-                {movie.duration}
+                <Tv size={20} />
+                {series.seasons}시즌 · {series.episodes}화
               </MetaItem>
             )}
-            {movie.ageRating && (
+            {series.ageRating && (
               <MetaItem>
-                {movie.ageRating}
+                {series.ageRating}
               </MetaItem>
             )}
           </MetaInfo>
           
-          <Description>{movie.description}</Description>
+          <Description>{series.description}</Description>
           
           <ActionButtons>
             <PlayButton>
@@ -298,41 +298,41 @@ export default function MovieDetailPage() {
       </HeroSection>
 
       <ContentSection>
-        <SectionTitle>영화 정보</SectionTitle>
+        <SectionTitle>시리즈 정보</SectionTitle>
         
         <InfoGrid>
           <InfoItem>
             <h3>장르</h3>
-            <p>{movie.genre}</p>
+            <p>{series.genre}</p>
           </InfoItem>
           
-          {movie.director && (
+          {series.director && (
             <InfoItem>
               <h3>감독</h3>
-              <p>{movie.director}</p>
+              <p>{series.director}</p>
             </InfoItem>
           )}
           
-          {movie.country && (
+          {series.country && (
             <InfoItem>
               <h3>제작 국가</h3>
-              <p>{movie.country}</p>
+              <p>{series.country}</p>
             </InfoItem>
           )}
           
-          {movie.language && (
+          {series.language && (
             <InfoItem>
               <h3>언어</h3>
-              <p>{movie.language}</p>
+              <p>{series.language}</p>
             </InfoItem>
           )}
         </InfoGrid>
 
-        {movie.cast && movie.cast.length > 0 && (
+        {series.cast && series.cast.length > 0 && (
           <>
             <SectionTitle>출연진</SectionTitle>
             <CastList>
-              {movie.cast.map((actor, index) => (
+              {series.cast.map((actor, index) => (
                 <CastItem key={index}>{actor}</CastItem>
               ))}
             </CastList>
@@ -342,3 +342,4 @@ export default function MovieDetailPage() {
     </Container>
   );
 }
+

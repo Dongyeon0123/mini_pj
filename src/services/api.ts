@@ -214,6 +214,44 @@ export const GENRES = [
 // 콘텐츠 API
 // ============================================
 
+// API 응답 처리 헬퍼 함수
+async function handleApiResponse<T>(response: Response, errorMessage: string): Promise<ApiResponse<T>> {
+  const contentType = response.headers.get('content-type');
+  
+  // Content-Type이 JSON이 아닌 경우
+  if (!contentType || !contentType.includes('application/json')) {
+    const text = await response.text();
+    console.error('❌ JSON이 아닌 응답:', text);
+    throw new Error(`서버가 올바른 응답을 반환하지 않았습니다. 백엔드 서버가 실행 중인지 확인하세요.`);
+  }
+
+  // 응답 텍스트를 먼저 가져옴
+  const responseText = await response.text();
+  
+  // 빈 응답 체크
+  if (!responseText || responseText.trim() === '') {
+    console.error('❌ 빈 응답 받음');
+    throw new Error('서버로부터 빈 응답을 받았습니다. 데이터베이스에 데이터가 있는지 확인하세요.');
+  }
+
+  // JSON 파싱
+  let result: ApiResponse<T>;
+  try {
+    result = JSON.parse(responseText);
+  } catch (parseError) {
+    console.error('❌ JSON 파싱 에러:', parseError);
+    console.error('응답 내용:', responseText.substring(0, 200));
+    throw new Error('서버 응답을 파싱할 수 없습니다. 백엔드 로그를 확인하세요.');
+  }
+
+  // HTTP 상태 코드 체크
+  if (!response.ok) {
+    throw new Error(result.message || errorMessage);
+  }
+
+  return result;
+}
+
 export const contentApi = {
   // 콘텐츠 목록 조회 (필터링, 검색, 페이징)
   getContents: async (
@@ -229,23 +267,22 @@ export const contentApi = {
       params.append('page', (filter.page || 0).toString());
       params.append('size', (filter.size || 20).toString());
 
-      const response = await fetch(
-        `${API_BASE_URL}/contents?${params.toString()}`,
-        {
-          method: 'GET',
-          headers: tokenManager.getAuthHeaders(),
-        }
+      const url = `${API_BASE_URL}/contents?${params.toString()}`;
+      console.log('🔍 API 요청:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: tokenManager.getAuthHeaders(),
+      });
+
+      console.log('📡 응답 상태:', response.status, response.statusText);
+      
+      return await handleApiResponse<ContentListResponse>(
+        response, 
+        '콘텐츠 목록 조회에 실패했습니다.'
       );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || '콘텐츠 목록 조회에 실패했습니다.');
-      }
-
-      return result;
     } catch (error) {
-      console.error('콘텐츠 목록 조회 API 에러:', error);
+      console.error('❌ 콘텐츠 목록 조회 API 에러:', error);
       throw error;
     }
   },
@@ -255,20 +292,22 @@ export const contentApi = {
     id: number
   ): Promise<ApiResponse<ContentDetail>> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/contents/${id}`, {
+      const url = `${API_BASE_URL}/contents/${id}`;
+      console.log('🔍 API 요청:', url);
+
+      const response = await fetch(url, {
         method: 'GET',
         headers: tokenManager.getAuthHeaders(),
       });
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || '콘텐츠 조회에 실패했습니다.');
-      }
-
-      return result;
+      console.log('📡 응답 상태:', response.status, response.statusText);
+      
+      return await handleApiResponse<ContentDetail>(
+        response,
+        '콘텐츠 조회에 실패했습니다.'
+      );
     } catch (error) {
-      console.error('콘텐츠 상세 조회 API 에러:', error);
+      console.error('❌ 콘텐츠 상세 조회 API 에러:', error);
       throw error;
     }
   },
@@ -278,23 +317,22 @@ export const contentApi = {
     limit: number = 10
   ): Promise<ApiResponse<Content[]>> => {
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/contents/recommended?limit=${limit}`,
-        {
-          method: 'GET',
-          headers: tokenManager.getAuthHeaders(),
-        }
+      const url = `${API_BASE_URL}/contents/recommended?limit=${limit}`;
+      console.log('🔍 API 요청:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: tokenManager.getAuthHeaders(),
+      });
+
+      console.log('📡 응답 상태:', response.status, response.statusText);
+      
+      return await handleApiResponse<Content[]>(
+        response,
+        '추천 콘텐츠 조회에 실패했습니다.'
       );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || '추천 콘텐츠 조회에 실패했습니다.');
-      }
-
-      return result;
     } catch (error) {
-      console.error('추천 콘텐츠 조회 API 에러:', error);
+      console.error('❌ 추천 콘텐츠 조회 API 에러:', error);
       throw error;
     }
   },
@@ -309,23 +347,22 @@ export const contentApi = {
       if (contentType) params.append('contentType', contentType);
       params.append('limit', limit.toString());
 
-      const response = await fetch(
-        `${API_BASE_URL}/contents/popular?${params.toString()}`,
-        {
-          method: 'GET',
-          headers: tokenManager.getAuthHeaders(),
-        }
+      const url = `${API_BASE_URL}/contents/popular?${params.toString()}`;
+      console.log('🔍 API 요청:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: tokenManager.getAuthHeaders(),
+      });
+
+      console.log('📡 응답 상태:', response.status, response.statusText);
+      
+      return await handleApiResponse<Content[]>(
+        response,
+        '인기 콘텐츠 조회에 실패했습니다.'
       );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || '인기 콘텐츠 조회에 실패했습니다.');
-      }
-
-      return result;
     } catch (error) {
-      console.error('인기 콘텐츠 조회 API 에러:', error);
+      console.error('❌ 인기 콘텐츠 조회 API 에러:', error);
       throw error;
     }
   },
@@ -340,23 +377,22 @@ export const contentApi = {
       if (contentType) params.append('contentType', contentType);
       params.append('limit', limit.toString());
 
-      const response = await fetch(
-        `${API_BASE_URL}/contents/latest?${params.toString()}`,
-        {
-          method: 'GET',
-          headers: tokenManager.getAuthHeaders(),
-        }
+      const url = `${API_BASE_URL}/contents/latest?${params.toString()}`;
+      console.log('🔍 API 요청:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: tokenManager.getAuthHeaders(),
+      });
+
+      console.log('📡 응답 상태:', response.status, response.statusText);
+      
+      return await handleApiResponse<Content[]>(
+        response,
+        '최신 콘텐츠 조회에 실패했습니다.'
       );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || '최신 콘텐츠 조회에 실패했습니다.');
-      }
-
-      return result;
     } catch (error) {
-      console.error('최신 콘텐츠 조회 API 에러:', error);
+      console.error('❌ 최신 콘텐츠 조회 API 에러:', error);
       throw error;
     }
   },
@@ -368,23 +404,22 @@ export const contentApi = {
     size: number = 20
   ): Promise<ApiResponse<ContentListResponse>> => {
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/contents/genre/${genre}?page=${page}&size=${size}`,
-        {
-          method: 'GET',
-          headers: tokenManager.getAuthHeaders(),
-        }
+      const url = `${API_BASE_URL}/contents/genre/${genre}?page=${page}&size=${size}`;
+      console.log('🔍 API 요청:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: tokenManager.getAuthHeaders(),
+      });
+
+      console.log('📡 응답 상태:', response.status, response.statusText);
+      
+      return await handleApiResponse<ContentListResponse>(
+        response,
+        '장르별 콘텐츠 조회에 실패했습니다.'
       );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || '장르별 콘텐츠 조회에 실패했습니다.');
-      }
-
-      return result;
     } catch (error) {
-      console.error('장르별 콘텐츠 조회 API 에러:', error);
+      console.error('❌ 장르별 콘텐츠 조회 API 에러:', error);
       throw error;
     }
   },
@@ -403,23 +438,22 @@ export const contentApi = {
       params.append('page', page.toString());
       params.append('size', size.toString());
 
-      const response = await fetch(
-        `${API_BASE_URL}/contents/search?${params.toString()}`,
-        {
-          method: 'GET',
-          headers: tokenManager.getAuthHeaders(),
-        }
+      const url = `${API_BASE_URL}/contents/search?${params.toString()}`;
+      console.log('🔍 API 요청:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: tokenManager.getAuthHeaders(),
+      });
+
+      console.log('📡 응답 상태:', response.status, response.statusText);
+      
+      return await handleApiResponse<ContentListResponse>(
+        response,
+        '콘텐츠 검색에 실패했습니다.'
       );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || '콘텐츠 검색에 실패했습니다.');
-      }
-
-      return result;
     } catch (error) {
-      console.error('콘텐츠 검색 API 에러:', error);
+      console.error('❌ 콘텐츠 검색 API 에러:', error);
       throw error;
     }
   },

@@ -879,3 +879,240 @@ export const userApi = {
     }
   },
 };
+
+// ==================== Admin API ====================
+export interface AdminStats {
+  totalUsers: number;
+  totalContents: number;
+  totalViews: number;
+  totalFavorites: number;
+  activeUsersToday: number;
+  newUsersThisMonth: number;
+  dailyStats: DailyStats[];
+  monthlyStats: MonthlyStats[];
+  popularContents: PopularContent[];
+  genreStats: { [key: string]: number };
+}
+
+export interface DailyStats {
+  date: string;
+  newUsers: number;
+  activeUsers: number;
+  totalViews: number;
+}
+
+export interface MonthlyStats {
+  month: string;
+  newUsers: number;
+  totalViews: number;
+  revenue: number;
+}
+
+export interface PopularContent {
+  contentId: number;
+  title: string;
+  type: string;
+  viewCount: number;
+  favoriteCount: number;
+}
+
+export interface UserManagement {
+  id: number;
+  email: string;
+  name: string;
+  phoneNumber: string;
+  role: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+  totalWatchCount: number;
+  totalFavoriteCount: number;
+}
+
+export interface CreateContentRequest {
+  title: string;
+  description: string;
+  genre: string;
+  year: number;
+  rating: number;
+  duration: string;
+  episodes?: number;
+  seasons?: number;
+  image: string;
+  thumbnailUrl: string;
+  contentType: 'MOVIE' | 'SERIES';
+  trailerUrl?: string;
+  videoUrl?: string;
+  director?: string;
+  cast?: string;
+  ageRating?: string;
+  releaseDate?: string;
+  country?: string;
+  language?: string;
+  tags?: string;
+}
+
+export const adminApi = {
+  // 통계 조회
+  getStats: async (): Promise<ApiResponse<AdminStats>> => {
+    try {
+      const url = `${API_BASE_URL}/admin/stats`;
+      console.log('📊 관리자 통계 조회 API 요청:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: tokenManager.getAuthHeaders(),
+      });
+
+      console.log('📡 응답 상태:', response.status, response.statusText);
+      
+      return await handleApiResponse<AdminStats>(
+        response,
+        '통계 조회에 실패했습니다.'
+      );
+    } catch (error) {
+      console.error('❌ 통계 조회 API 에러:', error);
+      throw error;
+    }
+  },
+
+  // 회원 목록 조회
+  getUsers: async (page: number = 0, size: number = 20): Promise<ApiResponse<UserManagement[]>> => {
+    try {
+      const url = `${API_BASE_URL}/admin/users?page=${page}&size=${size}`;
+      console.log('👥 회원 목록 조회 API 요청:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: tokenManager.getAuthHeaders(),
+      });
+
+      console.log('📡 응답 상태:', response.status, response.statusText);
+      
+      return await handleApiResponse<UserManagement[]>(
+        response,
+        '회원 목록 조회에 실패했습니다.'
+      );
+    } catch (error) {
+      console.error('❌ 회원 목록 조회 API 에러:', error);
+      throw error;
+    }
+  },
+
+  // 회원 상태 토글
+  toggleUserStatus: async (userId: number): Promise<ApiResponse<string>> => {
+    try {
+      const url = `${API_BASE_URL}/admin/users/${userId}/toggle`;
+      console.log('🔄 회원 상태 변경 API 요청:', url);
+
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: tokenManager.getAuthHeaders(),
+      });
+
+      console.log('📡 응답 상태:', response.status, response.statusText);
+      
+      return await handleApiResponse<string>(
+        response,
+        '회원 상태 변경에 실패했습니다.'
+      );
+    } catch (error) {
+      console.error('❌ 회원 상태 변경 API 에러:', error);
+      throw error;
+    }
+  },
+
+  // 회원 삭제
+  deleteUser: async (userId: number): Promise<ApiResponse<string>> => {
+    try {
+      const url = `${API_BASE_URL}/admin/users/${userId}`;
+      console.log('🗑️ 회원 삭제 API 요청:', url);
+
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: tokenManager.getAuthHeaders(),
+      });
+
+      console.log('📡 응답 상태:', response.status, response.statusText);
+      
+      return await handleApiResponse<string>(
+        response,
+        '회원 삭제에 실패했습니다.'
+      );
+    } catch (error) {
+      console.error('❌ 회원 삭제 API 에러:', error);
+      throw error;
+    }
+  },
+
+  // 콘텐츠 생성
+  createContent: async (request: CreateContentRequest): Promise<ApiResponse<ContentDetail>> => {
+    try {
+      const url = `${API_BASE_URL}/admin/contents`;
+      console.log('➕ 콘텐츠 생성 API 요청:', url, request);
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: tokenManager.getAuthHeaders(),
+        body: JSON.stringify(request),
+      });
+
+      console.log('📡 응답 상태:', response.status, response.statusText);
+      
+      return await handleApiResponse<ContentDetail>(
+        response,
+        '콘텐츠 생성에 실패했습니다.'
+      );
+    } catch (error) {
+      console.error('❌ 콘텐츠 생성 API 에러:', error);
+      throw error;
+    }
+  },
+
+  // 콘텐츠 수정
+  updateContent: async (contentId: number, request: CreateContentRequest): Promise<ApiResponse<ContentDetail>> => {
+    try {
+      const url = `${API_BASE_URL}/admin/contents/${contentId}`;
+      console.log('✏️ 콘텐츠 수정 API 요청:', url, request);
+
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: tokenManager.getAuthHeaders(),
+        body: JSON.stringify(request),
+      });
+
+      console.log('📡 응답 상태:', response.status, response.statusText);
+      
+      return await handleApiResponse<ContentDetail>(
+        response,
+        '콘텐츠 수정에 실패했습니다.'
+      );
+    } catch (error) {
+      console.error('❌ 콘텐츠 수정 API 에러:', error);
+      throw error;
+    }
+  },
+
+  // 콘텐츠 삭제
+  deleteContent: async (contentId: number): Promise<ApiResponse<string>> => {
+    try {
+      const url = `${API_BASE_URL}/admin/contents/${contentId}`;
+      console.log('🗑️ 콘텐츠 삭제 API 요청:', url);
+
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: tokenManager.getAuthHeaders(),
+      });
+
+      console.log('📡 응답 상태:', response.status, response.statusText);
+      
+      return await handleApiResponse<string>(
+        response,
+        '콘텐츠 삭제에 실패했습니다.'
+      );
+    } catch (error) {
+      console.error('❌ 콘텐츠 삭제 API 에러:', error);
+      throw error;
+    }
+  },
+};

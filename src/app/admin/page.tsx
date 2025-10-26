@@ -3,72 +3,36 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import styled from 'styled-components';
-import { tokenManager } from '../../services/api';
 import { 
+  BarChart3,
   Users, 
   Film, 
-  DollarSign, 
   TrendingUp, 
+  UserCheck,
   Eye, 
-  Play, 
   Heart, 
-  Star,
-  Plus,
+  Calendar,
   Edit,
   Trash2,
-  Search,
-  Filter,
-  Download,
-  Upload,
-  BarChart3,
-  PieChart,
-  Activity,
-  Calendar,
-  Clock,
-  AlertCircle,
-  CheckCircle,
-  XCircle,
-  Settings
+  Plus,
+  X,
+  Check,
+  Ban
 } from 'lucide-react';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
 import Input from '../../components/common/Input';
+import {
+  adminApi,
+  AdminStats,
+  UserManagement,
+  CreateContentRequest,
+  contentApi,
+  Content,
+  GENRES
+} from '../../services/api';
 
-// 임시 데이터
-const stats = {
-  totalUsers: 12543,
-  totalContent: 2847,
-  totalRevenue: 12500000,
-  monthlyGrowth: 12.5,
-  activeUsers: 8934,
-  totalViews: 2456789,
-  totalLikes: 156789,
-  averageRating: 4.2,
-};
-
-const recentUsers = [
-  { id: 1, name: '홍길동', email: 'hong@example.com', joinDate: '2024-01-20', status: 'active' },
-  { id: 2, name: '김철수', email: 'kim@example.com', joinDate: '2024-01-19', status: 'active' },
-  { id: 3, name: '이영희', email: 'lee@example.com', joinDate: '2024-01-18', status: 'inactive' },
-  { id: 4, name: '박민수', email: 'park@example.com', joinDate: '2024-01-17', status: 'active' },
-  { id: 5, name: '정수진', email: 'jung@example.com', joinDate: '2024-01-16', status: 'active' },
-];
-
-const popularContent = [
-  { id: 1, title: '오징어 게임 2', type: 'movie', views: 125678, rating: 9.2, status: 'active' },
-  { id: 2, title: '킹덤', type: 'series', views: 98765, rating: 8.9, status: 'active' },
-  { id: 3, title: '지옥', type: 'movie', views: 87654, rating: 8.5, status: 'active' },
-  { id: 4, title: '마이 네임', type: 'series', views: 76543, rating: 8.7, status: 'active' },
-  { id: 5, title: '스위트홈', type: 'series', views: 65432, rating: 8.3, status: 'inactive' },
-];
-
-const recentActivities = [
-  { id: 1, type: 'user_signup', message: '새로운 사용자가 가입했습니다', time: '2분 전', status: 'success' },
-  { id: 2, type: 'content_upload', message: '새로운 영화가 업로드되었습니다', time: '15분 전', status: 'info' },
-  { id: 3, type: 'payment_received', message: '결제가 완료되었습니다', time: '1시간 전', status: 'success' },
-  { id: 4, type: 'content_reported', message: '콘텐츠 신고가 접수되었습니다', time: '2시간 전', status: 'warning' },
-  { id: 5, type: 'system_error', message: '시스템 오류가 발생했습니다', time: '3시간 전', status: 'error' },
-];
+type TabType = 'dashboard' | 'contents' | 'users';
 
 const Container = styled.div`
   min-height: 100vh;
@@ -76,8 +40,8 @@ const Container = styled.div`
 `;
 
 const Header = styled.div`
-  background: linear-gradient(135deg, ${({ theme }) => theme.colors.primary[500]} 0%, ${({ theme }) => theme.colors.primary[600]} 100%);
-  padding: ${({ theme }) => theme.spacing[8]} 0;
+  background: linear-gradient(135deg, ${({ theme }) => theme.colors.error} 0%, #c81e1e 100%);
+  padding: ${({ theme }) => theme.spacing[12]} 0 ${({ theme }) => theme.spacing[6]};
   color: ${({ theme }) => theme.colors.white};
 `;
 
@@ -87,15 +51,39 @@ const HeaderContent = styled.div`
   padding: 0 ${({ theme }) => theme.spacing[4]};
 `;
 
-const HeaderTitle = styled.h1`
+const Title = styled.h1`
   font-size: ${({ theme }) => theme.fontSizes['4xl']};
   font-weight: ${({ theme }) => theme.fontWeights.bold};
-  margin-bottom: ${({ theme }) => theme.spacing[2]};
+  margin-bottom: ${({ theme }) => theme.spacing[6]};
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing[3]};
 `;
 
-const HeaderSubtitle = styled.p`
-  font-size: ${({ theme }) => theme.fontSizes.lg};
-  opacity: 0.9;
+const TabContainer = styled.div`
+  display: flex;
+  gap: ${({ theme }) => theme.spacing[2]};
+  overflow-x: auto;
+`;
+
+const Tab = styled.button<{ $active: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing[2]};
+  padding: ${({ theme }) => theme.spacing[3]} ${({ theme }) => theme.spacing[6]};
+  background-color: ${({ $active }) => $active ? 'rgba(255, 255, 255, 0.2)' : 'transparent'};
+  color: ${({ theme }) => theme.colors.white};
+  border: none;
+  border-bottom: 2px solid ${({ $active, theme }) => $active ? theme.colors.white : 'transparent'};
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: ${({ theme }) => theme.fontSizes.base};
+  font-weight: ${({ theme }) => theme.fontWeights.medium};
+  white-space: nowrap;
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
 `;
 
 const Content = styled.div`
@@ -113,70 +101,40 @@ const StatsGrid = styled.div`
 
 const StatCard = styled(Card)`
   padding: ${({ theme }) => theme.spacing[6]};
-  position: relative;
-  overflow: hidden;
-`;
-
-const StatHeader = styled.div`
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: ${({ theme }) => theme.spacing[4]};
+  gap: ${({ theme }) => theme.spacing[4]};
 `;
 
 const StatIcon = styled.div<{ $color: string }>`
-  width: 3rem;
-  height: 3rem;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
   background-color: ${({ $color }) => $color}20;
   color: ${({ $color }) => $color};
-  border-radius: ${({ theme }) => theme.borderRadius.xl};
   display: flex;
   align-items: center;
   justify-content: center;
 `;
 
-const StatTrend = styled.div<{ $positive: boolean }>`
-  display: flex;
-  align-items: center;
-  gap: ${({ theme }) => theme.spacing[1]};
-  font-size: ${({ theme }) => theme.fontSizes.sm};
-  font-weight: ${({ theme }) => theme.fontWeights.medium};
-  color: ${({ $positive, theme }) => $positive ? theme.colors.success : theme.colors.error};
-`;
-
-const StatNumber = styled.div`
-  font-size: ${({ theme }) => theme.fontSizes['3xl']};
-  font-weight: ${({ theme }) => theme.fontWeights.bold};
-  color: ${({ theme }) => theme.colors.gray[800]};
-  margin-bottom: ${({ theme }) => theme.spacing[2]};
+const StatInfo = styled.div`
+  flex: 1;
 `;
 
 const StatLabel = styled.div`
-  font-size: ${({ theme }) => theme.fontSizes.lg};
+  font-size: ${({ theme }) => theme.fontSizes.sm};
   color: ${({ theme }) => theme.colors.gray[600]};
-  font-weight: ${({ theme }) => theme.fontWeights.medium};
+  margin-bottom: ${({ theme }) => theme.spacing[1]};
 `;
 
-const ContentGrid = styled.div`
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: ${({ theme }) => theme.spacing[8]};
-  margin-bottom: ${({ theme }) => theme.spacing[8]};
-
-  @media (max-width: ${({ theme }) => theme.breakpoints.lg}) {
-    grid-template-columns: 1fr;
-    gap: ${({ theme }) => theme.spacing[6]};
-  }
+const StatValue = styled.div`
+  font-size: ${({ theme }) => theme.fontSizes['3xl']};
+  font-weight: ${({ theme }) => theme.fontWeights.bold};
+  color: ${({ theme }) => theme.colors.gray[800]};
 `;
 
-const MainSection = styled(Card)`
+const Section = styled(Card)`
   padding: ${({ theme }) => theme.spacing[6]};
-`;
-
-const SectionHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   margin-bottom: ${({ theme }) => theme.spacing[6]};
 `;
 
@@ -184,535 +142,869 @@ const SectionTitle = styled.h2`
   font-size: ${({ theme }) => theme.fontSizes['2xl']};
   font-weight: ${({ theme }) => theme.fontWeights.bold};
   color: ${({ theme }) => theme.colors.gray[800]};
+  margin-bottom: ${({ theme }) => theme.spacing[6]};
   display: flex;
   align-items: center;
-  gap: ${({ theme }) => theme.spacing[3]};
+  justify-content: space-between;
 `;
 
-const ActionButtons = styled.div`
-  display: flex;
-  gap: ${({ theme }) => theme.spacing[3]};
+const Table = styled.table`
+  width: 100%;
+  border-collapse: collapse;
 `;
 
-const SearchContainer = styled.div`
-  display: flex;
-  gap: ${({ theme }) => theme.spacing[4]};
-  margin-bottom: ${({ theme }) => theme.spacing[6]};
+const Thead = styled.thead`
+  background-color: ${({ theme }) => theme.colors.gray[100]};
 `;
 
-const Table = styled.div`
-  overflow-x: auto;
-`;
-
-const TableHeader = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 2fr 1fr 1fr 1fr;
-  gap: ${({ theme }) => theme.spacing[4]};
+const Th = styled.th`
   padding: ${({ theme }) => theme.spacing[4]};
-  background-color: ${({ theme }) => theme.colors.gray[50]};
-  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  text-align: left;
+  font-size: ${({ theme }) => theme.fontSizes.sm};
   font-weight: ${({ theme }) => theme.fontWeights.semibold};
   color: ${({ theme }) => theme.colors.gray[700]};
-  font-size: ${({ theme }) => theme.fontSizes.sm};
+  border-bottom: 2px solid ${({ theme }) => theme.colors.gray[200]};
 `;
 
-const TableRow = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 2fr 1fr 1fr 1fr;
-  gap: ${({ theme }) => theme.spacing[4]};
-  padding: ${({ theme }) => theme.spacing[4]};
-  border-bottom: 1px solid ${({ theme }) => theme.colors.gray[200]};
-  align-items: center;
-  transition: background-color 0.2s ease;
+const Tbody = styled.tbody``;
 
+const Tr = styled.tr`
   &:hover {
     background-color: ${({ theme }) => theme.colors.gray[50]};
   }
-
-  &:last-child {
-    border-bottom: none;
-  }
 `;
 
-const StatusBadge = styled.span<{ $status: string }>`
+const Td = styled.td`
+  padding: ${({ theme }) => theme.spacing[4]};
+  font-size: ${({ theme }) => theme.fontSizes.sm};
+  color: ${({ theme }) => theme.colors.gray[700]};
+  border-bottom: 1px solid ${({ theme }) => theme.colors.gray[200]};
+`;
+
+const Badge = styled.span<{ $variant: 'success' | 'error' | 'warning' }>`
   padding: ${({ theme }) => theme.spacing[1]} ${({ theme }) => theme.spacing[3]};
   border-radius: ${({ theme }) => theme.borderRadius.full};
   font-size: ${({ theme }) => theme.fontSizes.xs};
   font-weight: ${({ theme }) => theme.fontWeights.medium};
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  background-color: ${({ $status, theme }) => {
-    switch ($status) {
-      case 'active': return theme.colors.success + '20';
-      case 'inactive': return theme.colors.gray[200];
-      case 'pending': return theme.colors.warning + '20';
-      case 'error': return theme.colors.error + '20';
-      default: return theme.colors.gray[200];
+  
+  ${({ $variant, theme }) => {
+    switch ($variant) {
+      case 'success':
+        return `
+          background-color: ${theme.colors.success}20;
+          color: ${theme.colors.success};
+        `;
+      case 'error':
+        return `
+          background-color: ${theme.colors.error}20;
+          color: ${theme.colors.error};
+        `;
+      case 'warning':
+        return `
+          background-color: #F59E0B20;
+          color: #F59E0B;
+        `;
     }
-  }};
-  color: ${({ $status, theme }) => {
-    switch ($status) {
-      case 'active': return theme.colors.success;
-      case 'inactive': return theme.colors.gray[600];
-      case 'pending': return theme.colors.warning;
-      case 'error': return theme.colors.error;
-      default: return theme.colors.gray[600];
-    }
-  }};
+  }}
 `;
 
-const ActionButton = styled.button<{ $variant?: 'edit' | 'delete' | 'view' }>`
+const ActionButtons = styled.div`
+  display: flex;
+  gap: ${({ theme }) => theme.spacing[2]};
+`;
+
+const IconButton = styled.button<{ $variant?: 'primary' | 'danger' }>`
   width: 2rem;
   height: 2rem;
+  border-radius: ${({ theme }) => theme.borderRadius.md};
   border: none;
-  border-radius: ${({ theme }) => theme.borderRadius.lg};
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
-  background-color: ${({ $variant, theme }) => {
+  
+  ${({ $variant, theme }) => {
     switch ($variant) {
-      case 'edit': return theme.colors.info + '20';
-      case 'delete': return theme.colors.error + '20';
-      case 'view': return theme.colors.primary[100];
-      default: return theme.colors.gray[100];
-    }
-  }};
-  color: ${({ $variant, theme }) => {
-    switch ($variant) {
-      case 'edit': return theme.colors.info;
-      case 'delete': return theme.colors.error;
-      case 'view': return theme.colors.primary[600];
-      default: return theme.colors.gray[600];
-    }
-  }};
-
+      case 'danger':
+        return `
+          background-color: ${theme.colors.error}20;
+          color: ${theme.colors.error};
+          &:hover {
+            background-color: ${theme.colors.error};
+            color: ${theme.colors.white};
+          }
+        `;
+      default:
+        return `
+          background-color: ${theme.colors.primary[100]};
+          color: ${theme.colors.primary[600]};
   &:hover {
-    transform: scale(1.1);
-    background-color: ${({ $variant, theme }) => {
-      switch ($variant) {
-        case 'edit': return theme.colors.info + '40';
-        case 'delete': return theme.colors.error + '40';
-        case 'view': return theme.colors.primary[200];
-        default: return theme.colors.gray[200];
-      }
-    }};
-  }
+            background-color: ${theme.colors.primary[500]};
+            color: ${theme.colors.white};
+          }
+        `;
+    }
+  }}
 `;
 
-const ActivityList = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${({ theme }) => theme.spacing[4]};
-`;
-
-const ActivityItem = styled.div<{ $status?: string }>`
-  display: flex;
+const Modal = styled.div<{ $show: boolean }>`
+  display: ${({ $show }) => $show ? 'flex' : 'none'};
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
   align-items: center;
-  gap: ${({ theme }) => theme.spacing[4]};
+  justify-content: center;
+  z-index: 1000;
   padding: ${({ theme }) => theme.spacing[4]};
-  background-color: ${({ theme }) => theme.colors.gray[50]};
-  border-radius: ${({ theme }) => theme.borderRadius.lg};
-  border-left: 4px solid ${({ $status, theme }) => {
-    switch ($status) {
-      case 'success': return theme.colors.success;
-      case 'info': return theme.colors.info;
-      case 'warning': return theme.colors.warning;
-      case 'error': return theme.colors.error;
-      default: return theme.colors.gray[300];
-    }
-  }};
 `;
 
-const ActivityIcon = styled.div<{ $status: string }>`
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 50%;
+const ModalContent = styled.div`
+  background-color: ${({ theme }) => theme.colors.white};
+  border-radius: ${({ theme }) => theme.borderRadius.xl};
+  padding: ${({ theme }) => theme.spacing[6]};
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+`;
+
+const ModalHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: ${({ theme }) => theme.spacing[6]};
+`;
+
+const ModalTitle = styled.h3`
+  font-size: ${({ theme }) => theme.fontSizes['2xl']};
+  font-weight: ${({ theme }) => theme.fontWeights.bold};
+  color: ${({ theme }) => theme.colors.gray[800]};
+`;
+
+const CloseButton = styled.button`
+  width: 2rem;
+  height: 2rem;
+  border-radius: ${({ theme }) => theme.borderRadius.full};
+  border: none;
+  background-color: ${({ theme }) => theme.colors.gray[200]};
+  color: ${({ theme }) => theme.colors.gray[600]};
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: ${({ $status, theme }) => {
-    switch ($status) {
-      case 'success': return theme.colors.success + '20';
-      case 'info': return theme.colors.info + '20';
-      case 'warning': return theme.colors.warning + '20';
-      case 'error': return theme.colors.error + '20';
-      default: return theme.colors.gray[200];
-    }
-  }};
-  color: ${({ $status, theme }) => {
-    switch ($status) {
-      case 'success': return theme.colors.success;
-      case 'info': return theme.colors.info;
-      case 'warning': return theme.colors.warning;
-      case 'error': return theme.colors.error;
-      default: return theme.colors.gray[600];
-    }
-  }};
-`;
-
-const ActivityContent = styled.div`
-  flex: 1;
-`;
-
-const ActivityMessage = styled.div`
-  font-size: ${({ theme }) => theme.fontSizes.base};
-  font-weight: ${({ theme }) => theme.fontWeights.medium};
-  color: ${({ theme }) => theme.colors.gray[800]};
-  margin-bottom: ${({ theme }) => theme.spacing[1]};
-`;
-
-const ActivityTime = styled.div`
-  font-size: ${({ theme }) => theme.fontSizes.sm};
-  color: ${({ theme }) => theme.colors.gray[500]};
-`;
-
-const QuickActions = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: ${({ theme }) => theme.spacing[4]};
-  margin-top: ${({ theme }) => theme.spacing[8]};
-`;
-
-const QuickActionCard = styled(Card)`
-  padding: ${({ theme }) => theme.spacing[6]};
-  text-align: center;
   cursor: pointer;
   transition: all 0.2s ease;
 
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: ${({ theme }) => theme.shadows.lg};
+    background-color: ${({ theme }) => theme.colors.gray[300]};
   }
 `;
 
-const QuickActionIcon = styled.div`
-  width: 3rem;
-  height: 3rem;
-  background-color: ${({ theme }) => theme.colors.primary[100]};
-  color: ${({ theme }) => theme.colors.primary[600]};
-  border-radius: ${({ theme }) => theme.borderRadius.xl};
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto ${({ theme }) => theme.spacing[4]};
+const FormGroup = styled.div`
+  margin-bottom: ${({ theme }) => theme.spacing[4]};
 `;
 
-const QuickActionTitle = styled.h3`
-  font-size: ${({ theme }) => theme.fontSizes.lg};
-  font-weight: ${({ theme }) => theme.fontWeights.semibold};
-  color: ${({ theme }) => theme.colors.gray[800]};
+const Label = styled.label`
+  display: block;
+  font-size: ${({ theme }) => theme.fontSizes.sm};
+  font-weight: ${({ theme }) => theme.fontWeights.medium};
+  color: ${({ theme }) => theme.colors.gray[700]};
   margin-bottom: ${({ theme }) => theme.spacing[2]};
 `;
 
-const QuickActionDescription = styled.p`
-  font-size: ${({ theme }) => theme.fontSizes.sm};
-  color: ${({ theme }) => theme.colors.gray[600]};
+const Select = styled.select`
+  width: 100%;
+  padding: ${({ theme }) => theme.spacing[3]};
+  border: 1px solid ${({ theme }) => theme.colors.gray[300]};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  font-size: ${({ theme }) => theme.fontSizes.base};
+  color: ${({ theme }) => theme.colors.gray[700]};
+  background-color: ${({ theme }) => theme.colors.white};
+  
+  &:focus {
+    outline: none;
+    border-color: ${({ theme }) => theme.colors.primary[500]};
+  }
 `;
 
-export default function AdminDashboard() {
+const TextArea = styled.textarea`
+  width: 100%;
+  padding: ${({ theme }) => theme.spacing[3]};
+  border: 1px solid ${({ theme }) => theme.colors.gray[300]};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  font-size: ${({ theme }) => theme.fontSizes.base};
+  color: ${({ theme }) => theme.colors.gray[700]};
+  resize: vertical;
+  min-height: 100px;
+  
+  &:focus {
+    outline: none;
+    border-color: ${({ theme }) => theme.colors.primary[500]};
+  }
+`;
+
+const FormActions = styled.div`
+  display: flex;
+  gap: ${({ theme }) => theme.spacing[4]};
+  justify-content: flex-end;
+  margin-top: ${({ theme }) => theme.spacing[6]};
+`;
+
+const LoadingSpinner = styled.div`
+  text-align: center;
+  padding: ${({ theme }) => theme.spacing[12]};
+  color: ${({ theme }) => theme.colors.gray[500]};
+  font-size: ${({ theme }) => theme.fontSizes.lg};
+`;
+
+const ErrorMessage = styled.div`
+  background-color: ${({ theme }) => theme.colors.error}20;
+  color: ${({ theme }) => theme.colors.error};
+  padding: ${({ theme }) => theme.spacing[4]};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  margin-bottom: ${({ theme }) => theme.spacing[4]};
+  text-align: center;
+`;
+
+const SuccessMessage = styled.div`
+  background-color: ${({ theme }) => theme.colors.success}20;
+  color: ${({ theme }) => theme.colors.success};
+  padding: ${({ theme }) => theme.spacing[4]};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  margin-bottom: ${({ theme }) => theme.spacing[4]};
+  text-align: center;
+`;
+
+const CancelButton = styled(Button)`
+  background-color: ${({ theme }) => theme.colors.gray[500]};
+  
+  &:hover {
+    background-color: ${({ theme }) => theme.colors.gray[600]};
+  }
+`;
+
+export default function AdminPage() {
   const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [isAuthorized, setIsAuthorized] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  // 통계
+  const [stats, setStats] = useState<AdminStats | null>(null);
+
+  // 회원 관리
+  const [users, setUsers] = useState<UserManagement[]>([]);
+
+  // 콘텐츠 관리
+  const [contents, setContents] = useState<Content[]>([]);
+  const [showContentModal, setShowContentModal] = useState(false);
+  const [editingContent, setEditingContent] = useState<Content | null>(null);
+  const [contentForm, setContentForm] = useState<CreateContentRequest>({
+    title: '',
+    description: '',
+    genre: 'Drama',
+    year: new Date().getFullYear(),
+    rating: 0,
+    duration: '',
+    image: '',
+    thumbnailUrl: '',
+    contentType: 'MOVIE',
+  });
 
   // 관리자 권한 확인
   useEffect(() => {
-    const checkAdminAuth = () => {
-      const token = tokenManager.getToken();
-      const userInfo = localStorage.getItem('userInfo');
+    const token = localStorage.getItem('authToken');
+    const userStr = localStorage.getItem('user');
       
-      if (!token || !userInfo) {
-        // 로그인하지 않은 경우
+    if (!token || !userStr) {
+      alert('로그인이 필요합니다.');
         router.push('/auth/login');
         return;
       }
 
-      try {
-        const user = JSON.parse(userInfo);
+    const user = JSON.parse(userStr);
         if (user.role !== 'ADMIN') {
-          // 관리자가 아닌 경우
           alert('관리자 권한이 필요합니다.');
           router.push('/');
           return;
         }
         
-        setIsAuthorized(true);
-      } catch (error) {
-        console.error('사용자 정보 파싱 에러:', error);
-        router.push('/auth/login');
-        return;
-      }
-      
-      setIsLoading(false);
-    };
-
-    checkAdminAuth();
+    loadDashboard();
   }, [router]);
 
-  // 로딩 중이거나 권한이 없는 경우
-  if (isLoading) {
-    return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '100vh',
-        fontSize: '18px'
-      }}>
-        권한을 확인하는 중...
-      </div>
-    );
-  }
-
-  if (!isAuthorized) {
-    return null;
-  }
-
-  const filteredUsers = recentUsers.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = filterStatus === 'all' || user.status === filterStatus;
-    return matchesSearch && matchesFilter;
-  });
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'success': return <CheckCircle size={20} />;
-      case 'info': return <Activity size={20} />;
-      case 'warning': return <AlertCircle size={20} />;
-      case 'error': return <XCircle size={20} />;
-      default: return <Activity size={20} />;
+  // 대시보드 로드
+  const loadDashboard = async () => {
+    try {
+      setLoading(true);
+      const response = await adminApi.getStats();
+      if (response.success && response.data) {
+        setStats(response.data);
+      }
+    } catch (err: any) {
+      setError(err.message || '통계 조회에 실패했습니다.');
+    } finally {
+      setLoading(false);
     }
   };
+
+  // 탭 변경 시 데이터 로드
+  useEffect(() => {
+    const loadTabData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        if (activeTab === 'users') {
+          const response = await adminApi.getUsers();
+          if (response.success && response.data) {
+            setUsers(response.data);
+          }
+        } else if (activeTab === 'contents') {
+          const response = await contentApi.getContents('MOVIE', undefined, undefined, 'latest', 0, 100);
+          if (response.success && response.data) {
+            setContents(response.data.contents);
+          }
+        }
+      } catch (err: any) {
+        setError(err.message || '데이터 로드에 실패했습니다.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (activeTab !== 'dashboard') {
+      loadTabData();
+    }
+  }, [activeTab]);
+
+  // 회원 상태 토글
+  const handleToggleUserStatus = async (userId: number) => {
+    if (!window.confirm('회원 상태를 변경하시겠습니까?')) return;
+
+    try {
+      const response = await adminApi.toggleUserStatus(userId);
+      if (response.success) {
+        setSuccess('회원 상태가 변경되었습니다.');
+        setUsers(prev => prev.map(user => 
+          user.id === userId ? { ...user, enabled: !user.enabled } : user
+        ));
+      }
+    } catch (err: any) {
+      setError(err.message || '상태 변경에 실패했습니다.');
+    }
+  };
+
+  // 회원 삭제
+  const handleDeleteUser = async (userId: number, userName: string) => {
+    if (!window.confirm(`"${userName}" 회원을 삭제하시겠습니까?`)) return;
+
+    try {
+      const response = await adminApi.deleteUser(userId);
+      if (response.success) {
+        setSuccess('회원이 삭제되었습니다.');
+        setUsers(prev => prev.filter(user => user.id !== userId));
+      }
+    } catch (err: any) {
+      setError(err.message || '회원 삭제에 실패했습니다.');
+    }
+  };
+
+  // 콘텐츠 추가/수정 모달 열기
+  const handleOpenContentModal = (content?: Content) => {
+    if (content) {
+      setEditingContent(content);
+      setContentForm({
+        title: content.title,
+        description: content.description,
+        genre: content.genre,
+        year: content.year,
+        rating: content.rating,
+        duration: content.duration,
+        episodes: content.episodes,
+        seasons: content.seasons,
+        image: content.image,
+        thumbnailUrl: content.thumbnailUrl || content.image,
+        contentType: content.contentType as 'MOVIE' | 'SERIES',
+        trailerUrl: content.trailerUrl,
+        videoUrl: content.videoUrl,
+        director: content.director,
+        cast: content.cast,
+        ageRating: content.ageRating,
+        country: content.country,
+        language: content.language,
+        tags: content.tags,
+      });
+    } else {
+      setEditingContent(null);
+      setContentForm({
+        title: '',
+        description: '',
+        genre: 'Drama',
+        year: new Date().getFullYear(),
+        rating: 0,
+        duration: '',
+        image: '',
+        thumbnailUrl: '',
+        contentType: 'MOVIE',
+      });
+    }
+    setShowContentModal(true);
+  };
+
+  // 콘텐츠 저장
+  const handleSaveContent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      setLoading(true);
+      setError(null);
+
+      if (editingContent) {
+        // 수정
+        const response = await adminApi.updateContent(editingContent.id, contentForm);
+        if (response.success) {
+          setSuccess('콘텐츠가 수정되었습니다.');
+          setContents(prev => prev.map(c => 
+            c.id === editingContent.id ? { ...c, ...contentForm } : c
+          ));
+        }
+      } else {
+        // 추가
+        const response = await adminApi.createContent(contentForm);
+        if (response.success && response.data) {
+          setSuccess('콘텐츠가 추가되었습니다.');
+          const newContent: Content = {
+            id: response.data.id,
+            ...contentForm,
+            viewCount: 0,
+            likeCount: 0,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          setContents(prev => [newContent, ...prev]);
+        }
+      }
+      
+      setShowContentModal(false);
+    } catch (err: any) {
+      setError(err.message || '콘텐츠 저장에 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 콘텐츠 삭제
+  const handleDeleteContent = async (contentId: number, title: string) => {
+    if (!window.confirm(`"${title}" 콘텐츠를 삭제하시겠습니까?`)) return;
+
+    try {
+      const response = await adminApi.deleteContent(contentId);
+      if (response.success) {
+        setSuccess('콘텐츠가 삭제되었습니다.');
+        setContents(prev => prev.filter(c => c.id !== contentId));
+      }
+    } catch (err: any) {
+      setError(err.message || '콘텐츠 삭제에 실패했습니다.');
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('ko-KR');
+  };
+
+  const formatNumber = (num: number) => {
+    return num.toLocaleString('ko-KR');
+  };
+
+  if (loading && !stats && !users.length && !contents.length) {
+    return (
+      <Container>
+        <LoadingSpinner>로딩 중...</LoadingSpinner>
+      </Container>
+    );
+  }
 
   return (
     <Container>
       <Header>
         <HeaderContent>
-          <HeaderTitle>관리자 대시보드</HeaderTitle>
-          <HeaderSubtitle>U+ OTT 플랫폼 관리 및 모니터링</HeaderSubtitle>
+          <Title>
+            <BarChart3 size={40} />
+            관리자 페이지
+          </Title>
+          
+          <TabContainer>
+            <Tab $active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')}>
+              <TrendingUp size={20} />
+              대시보드
+            </Tab>
+            <Tab $active={activeTab === 'contents'} onClick={() => setActiveTab('contents')}>
+              <Film size={20} />
+              콘텐츠 관리
+            </Tab>
+            <Tab $active={activeTab === 'users'} onClick={() => setActiveTab('users')}>
+              <Users size={20} />
+              회원 관리
+            </Tab>
+          </TabContainer>
         </HeaderContent>
       </Header>
 
       <Content>
+        {error && <ErrorMessage>{error}</ErrorMessage>}
+        {success && <SuccessMessage>{success}</SuccessMessage>}
+
+        {/* 대시보드 탭 */}
+        {activeTab === 'dashboard' && stats && (
+          <>
         <StatsGrid>
           <StatCard>
-            <StatHeader>
-              <StatIcon $color="#10b981">
+                <StatIcon $color="#3B82F6">
                 <Users size={24} />
               </StatIcon>
-              <StatTrend $positive={true}>
-                <TrendingUp size={16} />
-                +5.2%
-              </StatTrend>
-            </StatHeader>
-            <StatNumber>{stats.totalUsers.toLocaleString()}</StatNumber>
-            <StatLabel>총 사용자</StatLabel>
+                <StatInfo>
+                  <StatLabel>전체 회원</StatLabel>
+                  <StatValue>{formatNumber(stats.totalUsers)}</StatValue>
+                </StatInfo>
           </StatCard>
 
           <StatCard>
-            <StatHeader>
-              <StatIcon $color="#3b82f6">
+                <StatIcon $color="#10B981">
                 <Film size={24} />
               </StatIcon>
-              <StatTrend $positive={true}>
-                <TrendingUp size={16} />
-                +12.3%
-              </StatTrend>
-            </StatHeader>
-            <StatNumber>{stats.totalContent.toLocaleString()}</StatNumber>
-            <StatLabel>총 콘텐츠</StatLabel>
+                <StatInfo>
+                  <StatLabel>전체 콘텐츠</StatLabel>
+                  <StatValue>{formatNumber(stats.totalContents)}</StatValue>
+                </StatInfo>
           </StatCard>
 
           <StatCard>
-            <StatHeader>
-              <StatIcon $color="#f59e0b">
-                <DollarSign size={24} />
+                <StatIcon $color="#F59E0B">
+                  <Eye size={24} />
               </StatIcon>
-              <StatTrend $positive={true}>
-                <TrendingUp size={16} />
-                +8.7%
-              </StatTrend>
-            </StatHeader>
-            <StatNumber>₩{(stats.totalRevenue / 1000000).toFixed(1)}M</StatNumber>
-            <StatLabel>총 수익</StatLabel>
+                <StatInfo>
+                  <StatLabel>총 시청 횟수</StatLabel>
+                  <StatValue>{formatNumber(stats.totalViews)}</StatValue>
+                </StatInfo>
           </StatCard>
 
           <StatCard>
-            <StatHeader>
-              <StatIcon $color="#8b5cf6">
-                <Eye size={24} />
+                <StatIcon $color="#EF4444">
+                  <Heart size={24} />
               </StatIcon>
-              <StatTrend $positive={true}>
-                <TrendingUp size={16} />
-                +15.4%
-              </StatTrend>
-            </StatHeader>
-            <StatNumber>{stats.totalViews.toLocaleString()}</StatNumber>
-            <StatLabel>총 조회수</StatLabel>
+                <StatInfo>
+                  <StatLabel>총 찜하기</StatLabel>
+                  <StatValue>{formatNumber(stats.totalFavorites)}</StatValue>
+                </StatInfo>
           </StatCard>
-        </StatsGrid>
 
-        <ContentGrid>
-          <MainSection>
-            <SectionHeader>
+              <StatCard>
+                <StatIcon $color="#8B5CF6">
+                  <UserCheck size={24} />
+                </StatIcon>
+                <StatInfo>
+                  <StatLabel>오늘 활성 사용자</StatLabel>
+                  <StatValue>{formatNumber(stats.activeUsersToday)}</StatValue>
+                </StatInfo>
+              </StatCard>
+
+              <StatCard>
+                <StatIcon $color="#06B6D4">
+                  <Calendar size={24} />
+                </StatIcon>
+                <StatInfo>
+                  <StatLabel>이번 달 신규 가입</StatLabel>
+                  <StatValue>{formatNumber(stats.newUsersThisMonth)}</StatValue>
+                </StatInfo>
+              </StatCard>
+            </StatsGrid>
+
+            <Section>
+              <SectionTitle>인기 콘텐츠 Top 10</SectionTitle>
+            <Table>
+                <Thead>
+                  <Tr>
+                    <Th>순위</Th>
+                    <Th>제목</Th>
+                    <Th>타입</Th>
+                    <Th>조회수</Th>
+                    <Th>찜하기</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {stats.popularContents.map((content, index) => (
+                    <Tr key={content.contentId}>
+                      <Td>{index + 1}</Td>
+                      <Td>{content.title}</Td>
+                      <Td>
+                        <Badge $variant={content.type === 'MOVIE' ? 'success' : 'warning'}>
+                          {content.type === 'MOVIE' ? '영화' : '시리즈'}
+                        </Badge>
+                      </Td>
+                      <Td>{formatNumber(content.viewCount)}</Td>
+                      <Td>{formatNumber(content.favoriteCount)}</Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+            </Table>
+            </Section>
+          </>
+        )}
+
+        {/* 콘텐츠 관리 탭 */}
+        {activeTab === 'contents' && (
+          <Section>
               <SectionTitle>
-                <Users size={24} />
-                최근 사용자
+              콘텐츠 목록
+              <Button onClick={() => handleOpenContentModal()}>
+                <Plus size={20} />
+                콘텐츠 추가
+              </Button>
               </SectionTitle>
-              <ActionButtons>
-                <Button variant="outline" size="sm">
-                  <Download size={16} />
-                  내보내기
-                </Button>
-                <Button size="sm">
-                  <Plus size={16} />
-                  사용자 추가
-                </Button>
-              </ActionButtons>
-            </SectionHeader>
+            
+            {loading ? (
+              <LoadingSpinner>로딩 중...</LoadingSpinner>
+            ) : (
+              <Table>
+                <Thead>
+                  <Tr>
+                    <Th>ID</Th>
+                    <Th>제목</Th>
+                    <Th>타입</Th>
+                    <Th>장르</Th>
+                    <Th>평점</Th>
+                    <Th>조회수</Th>
+                    <Th>작업</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {contents.map((content) => (
+                    <Tr key={content.id}>
+                      <Td>{content.id}</Td>
+                      <Td>{content.title}</Td>
+                      <Td>
+                        <Badge $variant={content.contentType === 'MOVIE' ? 'success' : 'warning'}>
+                          {content.contentType === 'MOVIE' ? '영화' : '시리즈'}
+                        </Badge>
+                      </Td>
+                      <Td>{content.genre}</Td>
+                      <Td>⭐ {content.rating}</Td>
+                      <Td>{formatNumber(content.viewCount)}</Td>
+                      <Td>
+            <ActionButtons>
+                          <IconButton onClick={() => handleOpenContentModal(content)}>
+                            <Edit size={16} />
+                          </IconButton>
+                          <IconButton $variant="danger" onClick={() => handleDeleteContent(content.id, content.title)}>
+                            <Trash2 size={16} />
+                          </IconButton>
+            </ActionButtons>
+                      </Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
+            )}
+          </Section>
+        )}
 
-            <SearchContainer>
+        {/* 회원 관리 탭 */}
+        {activeTab === 'users' && (
+          <Section>
+            <SectionTitle>회원 목록</SectionTitle>
+            
+            {loading ? (
+              <LoadingSpinner>로딩 중...</LoadingSpinner>
+            ) : (
+          <Table>
+                <Thead>
+                  <Tr>
+                    <Th>ID</Th>
+                    <Th>이메일</Th>
+                    <Th>이름</Th>
+                    <Th>역할</Th>
+                    <Th>상태</Th>
+                    <Th>시청 횟수</Th>
+                    <Th>찜하기</Th>
+                    <Th>가입일</Th>
+                    <Th>작업</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {users.map((user) => (
+                    <Tr key={user.id}>
+                      <Td>{user.id}</Td>
+                      <Td>{user.email}</Td>
+                      <Td>{user.name}</Td>
+                      <Td>
+                        <Badge $variant={user.role === 'ADMIN' ? 'error' : 'success'}>
+                          {user.role}
+                        </Badge>
+                      </Td>
+                      <Td>
+                        <Badge $variant={user.enabled ? 'success' : 'error'}>
+                          {user.enabled ? '활성' : '비활성'}
+                        </Badge>
+                      </Td>
+                      <Td>{formatNumber(user.totalWatchCount)}</Td>
+                      <Td>{formatNumber(user.totalFavoriteCount)}</Td>
+                      <Td>{formatDate(user.createdAt)}</Td>
+                      <Td>
+                        <ActionButtons>
+                          <IconButton onClick={() => handleToggleUserStatus(user.id)}>
+                            {user.enabled ? <Ban size={16} /> : <Check size={16} />}
+                          </IconButton>
+                          <IconButton $variant="danger" onClick={() => handleDeleteUser(user.id, user.name)}>
+                            <Trash2 size={16} />
+                          </IconButton>
+                        </ActionButtons>
+                      </Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+          </Table>
+            )}
+          </Section>
+        )}
+      </Content>
+
+      {/* 콘텐츠 추가/수정 모달 */}
+      <Modal $show={showContentModal}>
+        <ModalContent>
+          <ModalHeader>
+            <ModalTitle>{editingContent ? '콘텐츠 수정' : '콘텐츠 추가'}</ModalTitle>
+            <CloseButton onClick={() => setShowContentModal(false)}>
+              <X size={20} />
+            </CloseButton>
+          </ModalHeader>
+
+          <form onSubmit={handleSaveContent}>
+            <FormGroup>
+              <Label>제목 *</Label>
               <Input
                 type="text"
-                placeholder="사용자 검색..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={contentForm.title}
+                onChange={(e) => setContentForm({ ...contentForm, title: e.target.value })}
+                placeholder="콘텐츠 제목"
+                required
               />
-              <Button variant="outline" size="sm">
-                <Filter size={16} />
-                필터
+            </FormGroup>
+
+            <FormGroup>
+              <Label>설명 *</Label>
+              <TextArea
+                value={contentForm.description}
+                onChange={(e) => setContentForm({ ...contentForm, description: e.target.value })}
+                placeholder="콘텐츠 설명"
+                required
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <Label>타입 *</Label>
+              <Select
+                value={contentForm.contentType}
+                onChange={(e) => setContentForm({ ...contentForm, contentType: e.target.value as 'MOVIE' | 'SERIES' })}
+              >
+                <option value="MOVIE">영화</option>
+                <option value="SERIES">시리즈</option>
+              </Select>
+            </FormGroup>
+
+            <FormGroup>
+              <Label>장르 *</Label>
+              <Select
+                value={contentForm.genre}
+                onChange={(e) => setContentForm({ ...contentForm, genre: e.target.value })}
+              >
+                {GENRES.map((genre) => (
+                  <option key={genre} value={genre}>{genre}</option>
+                ))}
+              </Select>
+            </FormGroup>
+
+            <FormGroup>
+              <Label>개봉 연도 *</Label>
+              <Input
+                type="number"
+                value={contentForm.year}
+                onChange={(e) => setContentForm({ ...contentForm, year: parseInt(e.target.value) })}
+                placeholder="2024"
+                required
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <Label>평점 *</Label>
+              <Input
+                type="number"
+                step="0.1"
+                min="0"
+                max="10"
+                value={contentForm.rating}
+                onChange={(e) => setContentForm({ ...contentForm, rating: parseFloat(e.target.value) })}
+                placeholder="0.0"
+                required
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <Label>러닝타임 *</Label>
+              <Input
+                type="text"
+                value={contentForm.duration}
+                onChange={(e) => setContentForm({ ...contentForm, duration: e.target.value })}
+                placeholder="120분"
+                required
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <Label>이미지 URL *</Label>
+              <Input
+                type="text"
+                value={contentForm.image}
+                onChange={(e) => setContentForm({ ...contentForm, image: e.target.value, thumbnailUrl: e.target.value })}
+                placeholder="https://example.com/image.jpg"
+                required
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <Label>비디오 URL</Label>
+              <Input
+                type="text"
+                value={contentForm.videoUrl || ''}
+                onChange={(e) => setContentForm({ ...contentForm, videoUrl: e.target.value })}
+                placeholder="https://example.com/video.mp4"
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <Label>예고편 URL</Label>
+              <Input
+                type="text"
+                value={contentForm.trailerUrl || ''}
+                onChange={(e) => setContentForm({ ...contentForm, trailerUrl: e.target.value })}
+                placeholder="https://example.com/trailer.mp4"
+              />
+            </FormGroup>
+
+            <FormActions>
+              <CancelButton type="button" onClick={() => setShowContentModal(false)}>
+                취소
+              </CancelButton>
+              <Button type="submit" disabled={loading}>
+                {loading ? '저장 중...' : '저장'}
               </Button>
-            </SearchContainer>
-
-            <Table>
-              <TableHeader>
-                <div>ID</div>
-                <div>이름</div>
-                <div>이메일</div>
-                <div>가입일</div>
-                <div>상태</div>
-              </TableHeader>
-              {filteredUsers.map((user) => (
-                <TableRow key={user.id}>
-                  <div>{user.id}</div>
-                  <div>{user.name}</div>
-                  <div>{user.email}</div>
-                  <div>{new Date(user.joinDate).toLocaleDateString('ko-KR')}</div>
-                  <div>
-                    <StatusBadge $status={user.status}>
-                      {user.status === 'active' ? '활성' : '비활성'}
-                    </StatusBadge>
-                  </div>
-                </TableRow>
-              ))}
-            </Table>
-          </MainSection>
-
-          <MainSection>
-            <SectionHeader>
-              <SectionTitle>
-                <Activity size={24} />
-                최근 활동
-              </SectionTitle>
-            </SectionHeader>
-
-            <ActivityList>
-              {recentActivities.map((activity) => (
-                <ActivityItem key={activity.id} $status={activity.status}>
-                  <ActivityIcon $status={activity.status}>
-                    {getStatusIcon(activity.status)}
-                  </ActivityIcon>
-                  <ActivityContent>
-                    <ActivityMessage>{activity.message}</ActivityMessage>
-                    <ActivityTime>{activity.time}</ActivityTime>
-                  </ActivityContent>
-                </ActivityItem>
-              ))}
-            </ActivityList>
-          </MainSection>
-        </ContentGrid>
-
-        <MainSection>
-          <SectionHeader>
-            <SectionTitle>
-              <Film size={24} />
-              인기 콘텐츠
-            </SectionTitle>
-            <ActionButtons>
-              <Button variant="outline" size="sm">
-                <Upload size={16} />
-                콘텐츠 업로드
-              </Button>
-            </ActionButtons>
-          </SectionHeader>
-
-          <Table>
-            <TableHeader>
-              <div>ID</div>
-              <div>제목</div>
-              <div>조회수</div>
-              <div>평점</div>
-              <div>상태</div>
-            </TableHeader>
-            {popularContent.map((content) => (
-              <TableRow key={content.id}>
-                <div>{content.id}</div>
-                <div>{content.title}</div>
-                <div>{content.views.toLocaleString()}</div>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Star size={16} fill="currentColor" color="#fbbf24" />
-                    {content.rating}
-                  </div>
-                </div>
-                <div>
-                  <StatusBadge $status={content.status}>
-                    {content.status === 'active' ? '활성' : '비활성'}
-                  </StatusBadge>
-                </div>
-              </TableRow>
-            ))}
-          </Table>
-        </MainSection>
-
-        <QuickActions>
-          <QuickActionCard>
-            <QuickActionIcon>
-              <Plus size={24} />
-            </QuickActionIcon>
-            <QuickActionTitle>콘텐츠 추가</QuickActionTitle>
-            <QuickActionDescription>새로운 영화나 시리즈를 추가하세요</QuickActionDescription>
-          </QuickActionCard>
-
-          <QuickActionCard>
-            <QuickActionIcon>
-              <Users size={24} />
-            </QuickActionIcon>
-            <QuickActionTitle>사용자 관리</QuickActionTitle>
-            <QuickActionDescription>사용자 계정을 관리하고 모니터링하세요</QuickActionDescription>
-          </QuickActionCard>
-
-          <QuickActionCard>
-            <QuickActionIcon>
-              <BarChart3 size={24} />
-            </QuickActionIcon>
-            <QuickActionTitle>통계 보기</QuickActionTitle>
-            <QuickActionDescription>상세한 분석 리포트를 확인하세요</QuickActionDescription>
-          </QuickActionCard>
-
-          <QuickActionCard>
-            <QuickActionIcon>
-              <Settings size={24} />
-            </QuickActionIcon>
-            <QuickActionTitle>시스템 설정</QuickActionTitle>
-            <QuickActionDescription>플랫폼 설정을 관리하세요</QuickActionDescription>
-          </QuickActionCard>
-        </QuickActions>
-      </Content>
+            </FormActions>
+          </form>
+        </ModalContent>
+      </Modal>
     </Container>
   );
 }

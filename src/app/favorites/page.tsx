@@ -390,6 +390,32 @@ const TypeIcon = styled.div`
   font-weight: ${({ theme }) => theme.fontWeights.medium};
 `;
 
+const RemoveAllButton = styled.button`
+  padding: ${({ theme }) => theme.spacing[2]} ${({ theme }) => theme.spacing[4]};
+  background-color: rgba(239, 68, 68, 0.1);
+  color: ${({ theme }) => theme.colors.error};
+  border: 1px solid ${({ theme }) => theme.colors.error}40;
+  border-radius: ${({ theme }) => theme.borderRadius.full};
+  font-size: ${({ theme }) => theme.fontSizes.sm};
+  font-weight: ${({ theme }) => theme.fontWeights.medium};
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing[2]};
+
+  &:hover {
+    background-color: ${({ theme }) => theme.colors.error};
+    color: white;
+    border-color: ${({ theme }) => theme.colors.error};
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
 const AddedDate = styled.div`
   font-size: ${({ theme }) => theme.fontSizes.xs};
   color: ${({ theme }) => theme.colors.gray[500]};
@@ -560,6 +586,63 @@ export default function FavoritesPage() {
     }
   };
 
+  const handleRemoveAll = async () => {
+    if (!userId) {
+      alert('로그인이 필요합니다.');
+      router.push('/auth/login');
+      return;
+    }
+
+    if (favorites.length === 0) {
+      alert('삭제할 찜 목록이 없습니다.');
+      return;
+    }
+
+    // 확인 다이얼로그
+    const confirmed = window.confirm(
+      `찜한 콘텐츠 ${favorites.length}개를 모두 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`
+    );
+    if (!confirmed) return;
+
+    try {
+      console.log('🗑️ 전체 찜하기 제거 중... count:', favorites.length);
+      
+      // 모든 찜하기를 순차적으로 제거
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const favorite of favorites) {
+        try {
+          const response = await favoriteApi.removeFavorite(userId, favorite.contentId);
+          if (response.success) {
+            successCount++;
+          } else {
+            failCount++;
+          }
+        } catch (err) {
+          console.error('개별 찜하기 제거 실패:', favorite.contentId, err);
+          failCount++;
+        }
+      }
+
+      // 모든 작업 완료 후 UI 업데이트
+      setFavorites([]);
+      
+      if (failCount === 0) {
+        alert(`찜 목록 ${successCount}개가 모두 제거되었습니다.`);
+      } else {
+        alert(`${successCount}개 제거 성공, ${failCount}개 실패했습니다.`);
+        // 실패한 경우 목록 새로고침
+        window.location.reload();
+      }
+
+      console.log(`✅ 전체 제거 완료 - 성공: ${successCount}, 실패: ${failCount}`);
+    } catch (err) {
+      console.error('❌ 전체 찜하기 제거 실패:', err);
+      alert('찜 목록 전체 삭제 중 오류가 발생했습니다.');
+    }
+  };
+
   // 로딩 중
   if (loading) {
     return (
@@ -693,6 +776,14 @@ export default function FavoritesPage() {
                 시리즈
               </TypeButton>
             </TypeFilter>
+            
+            <RemoveAllButton 
+              onClick={handleRemoveAll}
+              disabled={favorites.length === 0}
+            >
+              <Trash2 size={16} />
+              전체 삭제 ({favorites.length})
+            </RemoveAllButton>
           </FilterGroup>
 
           <ViewToggle>

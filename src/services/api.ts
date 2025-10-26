@@ -67,7 +67,7 @@ export const authApi = {
   login: async (data: LoginRequest): Promise<ApiResponse<LoginResponse>> => {
     try {
       console.log('=== API 호출 시작 ===');
-      console.log('요청 URL:', `${API_BASE_URL}/auth/login`);
+      console.log('요청 URL:', `${API_BASE_URL}/auth/login`);  
       console.log('요청 데이터:', data);
       
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
@@ -454,6 +454,145 @@ export const contentApi = {
       );
     } catch (error) {
       console.error('❌ 콘텐츠 검색 API 에러:', error);
+      throw error;
+    }
+  },
+};
+
+// ============================================
+// 찜하기 API
+// ============================================
+
+export interface FavoriteResponse {
+  id: number;
+  userId: number;
+  contentId: number;
+  createdAt: string;
+}
+
+export const favoriteApi = {
+  // 찜하기 추가
+  addFavorite: async (
+    userId: number,
+    contentId: number
+  ): Promise<ApiResponse<FavoriteResponse>> => {
+    try {
+      const url = `${API_BASE_URL}/favorites?userId=${userId}&contentId=${contentId}`;
+      console.log('🔍 API 요청:', url);
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: tokenManager.getAuthHeaders(),
+      });
+
+      console.log('📡 응답 상태:', response.status, response.statusText);
+      
+      return await handleApiResponse<FavoriteResponse>(
+        response,
+        '찜하기 추가에 실패했습니다.'
+      );
+    } catch (error) {
+      console.error('❌ 찜하기 추가 API 에러:', error);
+      throw error;
+    }
+  },
+
+  // 찜하기 취소
+  removeFavorite: async (
+    userId: number,
+    contentId: number
+  ): Promise<ApiResponse<null>> => {
+    try {
+      const url = `${API_BASE_URL}/favorites?userId=${userId}&contentId=${contentId}`;
+      console.log('🔍 API 요청:', url);
+
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: tokenManager.getAuthHeaders(),
+      });
+
+      console.log('📡 응답 상태:', response.status, response.statusText);
+      
+      return await handleApiResponse<null>(
+        response,
+        '찜하기 취소에 실패했습니다.'
+      );
+    } catch (error) {
+      console.error('❌ 찜하기 취소 API 에러:', error);
+      throw error;
+    }
+  },
+
+  // 사용자의 찜 목록 조회
+  getUserFavorites: async (userId: number): Promise<ApiResponse<Content[]>> => {
+    try {
+      const url = `${API_BASE_URL}/favorites/user/${userId}`;
+      console.log('🔍 API 요청:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: tokenManager.getAuthHeaders(),
+      });
+
+      console.log('📡 응답 상태:', response.status, response.statusText);
+      
+      return await handleApiResponse<Content[]>(
+        response,
+        '찜 목록 조회에 실패했습니다.'
+      );
+    } catch (error) {
+      console.error('❌ 찜 목록 조회 API 에러:', error);
+      throw error;
+    }
+  },
+
+  // 찜 여부 확인
+  checkFavorite: async (
+    userId: number,
+    contentId: number
+  ): Promise<ApiResponse<{ isFavorite: boolean }>> => {
+    try {
+      const url = `${API_BASE_URL}/favorites/check?userId=${userId}&contentId=${contentId}`;
+      console.log('🔍 API 요청:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: tokenManager.getAuthHeaders(),
+      });
+
+      console.log('📡 응답 상태:', response.status, response.statusText);
+      
+      return await handleApiResponse<{ isFavorite: boolean }>(
+        response,
+        '찜 여부 확인에 실패했습니다.'
+      );
+    } catch (error) {
+      console.error('❌ 찜 여부 확인 API 에러:', error);
+      throw error;
+    }
+  },
+
+  // 콘텐츠의 찜 개수
+  getFavoriteCount: async (
+    contentId: number
+  ): Promise<ApiResponse<{ count: number }>> => {
+    try {
+      const url = `${API_BASE_URL}/favorites/count/${contentId}`;
+      console.log('🔍 API 요청:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: tokenManager.getAuthHeaders(),
+      });
+
+      console.log('📡 응답 상태:', response.status, response.statusText);
+      
+      return await handleApiResponse<{ count: number }>(
+        response,
+        '찜 개수 조회에 실패했습니다.'
+      );
+    } catch (error) {
+      console.error('❌ 찜 개수 조회 API 에러:', error);
       throw error;
     }
   },

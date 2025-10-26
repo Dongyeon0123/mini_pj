@@ -3,9 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import styled from 'styled-components';
-import { Play, Plus, Download, Share2, Star, Clock, Calendar, Tv, ChevronLeft } from 'lucide-react';
+import { Play, Plus, Download, Share2, Star, Clock, Calendar, Tv, ChevronLeft, Check, Heart } from 'lucide-react';
 import Button from '../../../components/common/Button';
-import { contentApi } from '../../../services/api';
+import VideoPlayer from '../../../components/VideoPlayer';
+import { contentApi, favoriteApi } from '../../../services/api';
 import type { ContentDetail } from '../../../services/api';
 
 const Container = styled.div`
@@ -121,6 +122,26 @@ const SecondaryButton = styled(Button)`
   }
 `;
 
+const FavoriteButton = styled(Button)<{ $isFavorite: boolean }>`
+  background: ${({ $isFavorite }) => 
+    $isFavorite ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.1)'
+  };
+  backdrop-filter: blur(10px);
+  color: white;
+  border: 1px solid ${({ $isFavorite }) => 
+    $isFavorite ? 'rgba(239, 68, 68, 0.5)' : 'rgba(255, 255, 255, 0.2)'
+  };
+  font-size: ${({ theme }) => theme.fontSizes.lg};
+  padding: ${({ theme }) => theme.spacing[4]} ${({ theme }) => theme.spacing[6]};
+  height: auto;
+
+  &:hover {
+    background: ${({ $isFavorite }) => 
+      $isFavorite ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255, 255, 255, 0.2)'
+    };
+  }
+`;
+
 const ContentSection = styled.div`
   max-width: 1200px;
   margin: 0 auto;
@@ -195,6 +216,13 @@ export default function SeriesDetailPage() {
   const [series, setSeries] = useState<ContentDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showPlayer, setShowPlayer] = useState(false);
+  const [showTrailer, setShowTrailer] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [favoriteLoading, setFavoriteLoading] = useState(false);
+  
+  // 임시 사용자 ID (실제로는 로그인 정보에서 가져와야 함)
+  const TEMP_USER_ID = 1;
 
   useEffect(() => {
     const fetchSeries = async () => {
@@ -212,6 +240,16 @@ export default function SeriesDetailPage() {
 
         if (response.success && response.data) {
           setSeries(response.data);
+          
+          // 찜 여부 확인
+          try {
+            const favoriteResponse = await favoriteApi.checkFavorite(TEMP_USER_ID, id);
+            if (favoriteResponse.success && favoriteResponse.data) {
+              setIsFavorite(favoriteResponse.data.isFavorite);
+            }
+          } catch (err) {
+            console.log('찜 여부 확인 실패:', err);
+          }
         }
       } catch (err) {
         console.error('시리즈 조회 실패:', err);
@@ -223,6 +261,41 @@ export default function SeriesDetailPage() {
 
     fetchSeries();
   }, [params]);
+
+  const handlePlaySeries = () => {
+    setShowPlayer(true);
+  };
+
+  const handlePlayTrailer = () => {
+    setShowTrailer(true);
+  };
+
+  const handleToggleFavorite = async () => {
+    if (!series || favoriteLoading) return;
+
+    try {
+      setFavoriteLoading(true);
+
+      if (isFavorite) {
+        const response = await favoriteApi.removeFavorite(TEMP_USER_ID, series.id);
+        if (response.success) {
+          setIsFavorite(false);
+          alert('찜 목록에서 제거되었습니다.');
+        }
+      } else {
+        const response = await favoriteApi.addFavorite(TEMP_USER_ID, series.id);
+        if (response.success) {
+          setIsFavorite(true);
+          alert('찜 목록에 추가되었습니다.');
+        }
+      }
+    } catch (err: any) {
+      console.error('찜하기 처리 실패:', err);
+      alert(err.message || '찜하기 처리에 실패했습니다.');
+    } finally {
+      setFavoriteLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -243,6 +316,28 @@ export default function SeriesDetailPage() {
 
   return (
     <Container>
+      {/* 비디오 플레이어 */}
+      {showPlayer && series && (
+        <VideoPlayer
+          src={series.videoUrl || ''}
+          poster={series.image}
+          title={series.title}
+          onClose={() => setShowPlayer(false)}
+          autoPlay
+        />
+      )}
+
+      {/* 예고편 플레이어 */}
+      {showTrailer && series && series.trailerUrl && (
+        <VideoPlayer
+          src={series.trailerUrl}
+          poster={series.image}
+          title={`${series.title} - 예고편`}
+          onClose={() => setShowTrailer(false)}
+          autoPlay
+        />
+      )}
+
       <HeroSection $image={series.image}>
         <HeroContent>
           <BackButton onClick={() => router.back()}>
@@ -277,18 +372,36 @@ export default function SeriesDetailPage() {
           <Description>{series.description}</Description>
           
           <ActionButtons>
-            <PlayButton>
+            <PlayButton onClick={handlePlaySeries}>
               <Play size={24} fill="currentColor" />
               재생
             </PlayButton>
-            <SecondaryButton>
-              <Plus size={24} />
-              찜하기
-            </SecondaryButton>
-            <SecondaryButton>
-              <Download size={24} />
-              다운로드
-            </SecondaryButton>
+            
+            {series.trailerUrl && (
+              <SecondaryButton onClick={handlePlayTrailer}>
+                <Play size={20} />
+                예고편
+              </SecondaryButton>
+            )}
+            
+            <FavoriteButton 
+              onClick={handleToggleFavorite}
+              disabled={favoriteLoading}
+              $isFavorite={isFavorite}
+            >
+              {isFavorite ? (
+                <>
+                  <Check size={24} />
+                  찜 완료
+                </>
+              ) : (
+                <>
+                  <Heart size={24} />
+                  찜하기
+                </>
+              )}
+            </FavoriteButton>
+            
             <SecondaryButton>
               <Share2 size={24} />
               공유

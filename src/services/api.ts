@@ -31,6 +31,7 @@ export interface LoginRequest {
 
 // 로그인 응답 타입
 export interface LoginResponse {
+  id: number;
   token: string;
   email: string;
   name: string;
@@ -67,7 +68,7 @@ export const authApi = {
   login: async (data: LoginRequest): Promise<ApiResponse<LoginResponse>> => {
     try {
       console.log('=== API 호출 시작 ===');
-      console.log('요청 URL:', `${API_BASE_URL}/auth/login`);  
+      console.log('요청 URL:', `${API_BASE_URL}/auth/login`);
       console.log('요청 데이터:', data);
       
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
@@ -467,6 +468,9 @@ export interface FavoriteResponse {
   id: number;
   userId: number;
   contentId: number;
+  contentTitle: string;
+  contentImage: string;
+  contentType: string;
   createdAt: string;
 }
 
@@ -524,7 +528,7 @@ export const favoriteApi = {
   },
 
   // 사용자의 찜 목록 조회
-  getUserFavorites: async (userId: number): Promise<ApiResponse<Content[]>> => {
+  getUserFavorites: async (userId: number): Promise<ApiResponse<FavoriteResponse[]>> => {
     try {
       const url = `${API_BASE_URL}/favorites/user/${userId}`;
       console.log('🔍 API 요청:', url);
@@ -536,7 +540,7 @@ export const favoriteApi = {
 
       console.log('📡 응답 상태:', response.status, response.statusText);
       
-      return await handleApiResponse<Content[]>(
+      return await handleApiResponse<FavoriteResponse[]>(
         response,
         '찜 목록 조회에 실패했습니다.'
       );

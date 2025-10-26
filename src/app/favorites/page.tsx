@@ -1,85 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import styled from 'styled-components';
-import { Play, Plus, Star, Heart, Trash2, Grid, List, Film, Tv } from 'lucide-react';
+import { Play, Plus, Star, Heart, Trash2, Grid, List, Film, Tv, Loader2 } from 'lucide-react';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
-
-// 임시 데이터
-const favoriteContent = [
-  {
-    id: 1,
-    title: '오징어 게임 2',
-    type: 'movie',
-    genre: '드라마',
-    year: 2024,
-    rating: 9.2,
-    duration: '60분',
-    image: './오징어게임.jpg',
-    addedDate: '2024-01-15',
-  },
-  {
-    id: 2,
-    title: '킹덤',
-    type: 'series',
-    genre: '액션',
-    year: 2023,
-    rating: 8.9,
-    episodes: 12,
-    seasons: 2,
-    image: '/킹덤.jpg',
-    addedDate: '2024-01-10',
-  },
-  {
-    id: 3,
-    title: '지옥',
-    type: 'movie',
-    genre: '공포',
-    year: 2023,
-    rating: 8.5,
-    duration: '50분',
-    image: './지옥.jpg',
-    addedDate: '2024-01-08',
-  },
-  {
-    id: 4,
-    title: '마이 네임',
-    type: 'series',
-    genre: '액션',
-    year: 2023,
-    rating: 8.7,
-    episodes: 8,
-    seasons: 1,
-    image: './마이네임.jpg',
-    addedDate: '2024-01-05',
-  },
-  {
-    id: 5,
-    title: '스위트홈',
-    type: 'series',
-    genre: '공포',
-    year: 2023,
-    rating: 8.3,
-    episodes: 10,
-    seasons: 1,
-    image: './스위트홈.jpg',
-    addedDate: '2024-01-03',
-  },
-  {
-    id: 6,
-    title: '더 글로리',
-    type: 'series',
-    genre: '드라마',
-    year: 2023,
-    rating: 8.8,
-    episodes: 8,
-    seasons: 1,
-    image: './더글로리.jpg',
-    addedDate: '2024-01-01',
-  },
-];
+import { favoriteApi, ContentType, FavoriteResponse } from '../../services/api';
 
 const Container = styled.div`
   min-height: 100vh;
@@ -395,16 +323,18 @@ const RemoveButton = styled.button`
   right: ${({ theme }) => theme.spacing[3]};
   width: 2.5rem;
   height: 2.5rem;
-  background-color: rgba(0, 0, 0, 0.7);
+  background-color: rgba(239, 68, 68, 0.8);
   color: ${({ theme }) => theme.colors.white};
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
-  opacity: 0;
+  opacity: 0.9;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 
   ${ContentCard}:hover & {
     opacity: 1;
@@ -412,7 +342,12 @@ const RemoveButton = styled.button`
 
   &:hover {
     background-color: ${({ theme }) => theme.colors.error};
-    transform: scale(1.1);
+    transform: scale(1.15);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.5);
+  }
+
+  &:active {
+    transform: scale(1.05);
   }
 `;
 
@@ -491,27 +426,189 @@ const EmptyDescription = styled.p`
   margin-bottom: ${({ theme }) => theme.spacing[8]};
 `;
 
-export default function FavoritesPage() {
-  const [selectedType, setSelectedType] = useState<'all' | 'movie' | 'series'>('all');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+const LoadingContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 50vh;
+  color: ${({ theme }) => theme.colors.primary[500]};
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing[4]};
+`;
 
-  const filteredContent = favoriteContent.filter(content => {
+const LoadingText = styled.p`
+  font-size: ${({ theme }) => theme.fontSizes.lg};
+  color: ${({ theme }) => theme.colors.gray[600]};
+`;
+
+const ErrorContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 50vh;
+  color: ${({ theme }) => theme.colors.error};
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing[4]};
+`;
+
+const ErrorText = styled.p`
+  font-size: ${({ theme }) => theme.fontSizes.lg};
+  color: ${({ theme }) => theme.colors.gray[600]};
+  text-align: center;
+  max-width: 500px;
+`;
+
+export default function FavoritesPage() {
+  const router = useRouter();
+  const [selectedType, setSelectedType] = useState<'all' | 'MOVIE' | 'SERIES'>('all');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [favorites, setFavorites] = useState<FavoriteResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [userId, setUserId] = useState<number | null>(null);
+
+  // 로그인 확인 및 찜하기 목록 불러오기
+  useEffect(() => {
+    const checkAuthAndLoadFavorites = async () => {
+      try {
+        // 1. 로그인 확인
+        const token = localStorage.getItem('authToken');
+        const userDataStr = localStorage.getItem('user');
+        
+        console.log('🔍 로그인 확인 중...');
+        console.log('Token:', token ? '존재함' : '없음');
+        console.log('User Data:', userDataStr ? '존재함' : '없음');
+        
+        if (!token || !userDataStr) {
+          console.warn('⚠️ 로그인이 필요합니다. 로그인 페이지로 이동합니다.');
+          router.push('/auth/login?redirect=/favorites');
+          return;
+        }
+
+        const userData = JSON.parse(userDataStr);
+        setUserId(userData.id);
+        console.log('👤 사용자 정보:', userData);
+
+        // 2. 찜하기 목록 불러오기
+        console.log('📋 찜하기 목록 불러오는 중... userId:', userData.id);
+        const response = await favoriteApi.getUserFavorites(userData.id);
+
+        console.log('📡 API 응답:', response);
+        console.log('📊 응답 success:', response.success);
+        console.log('📊 응답 data:', response.data);
+        console.log('📊 응답 data 길이:', response.data?.length);
+
+        if (response.success && response.data) {
+          setFavorites(response.data);
+          console.log('✅ 찜하기 목록 불러오기 성공, 개수:', response.data.length);
+          console.log('📝 첫 번째 아이템:', response.data[0]);
+        } else {
+          console.error('❌ 찜하기 목록 불러오기 실패:', response.message);
+          setError(response.message || '찜하기 목록을 불러오는데 실패했습니다.');
+        }
+      } catch (err) {
+        console.error('❌ 찜하기 목록 불러오기 실패:', err);
+        setError('찜하기 목록을 불러오는 중 오류가 발생했습니다.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuthAndLoadFavorites();
+  }, [router]);
+
+  // 필터링된 콘텐츠
+  const filteredContent = favorites.filter(favorite => {
     if (selectedType === 'all') return true;
-    return content.type === selectedType;
+    return favorite.contentType === selectedType;
   });
 
-  const movieCount = favoriteContent.filter(content => content.type === 'movie').length;
-  const seriesCount = favoriteContent.filter(content => content.type === 'series').length;
+  const movieCount = favorites.filter(fav => fav.contentType === 'MOVIE').length;
+  const seriesCount = favorites.filter(fav => fav.contentType === 'SERIES').length;
 
   const handlePlay = (contentId: number) => {
-    console.log('재생 시작:', contentId);
+    console.log('▶️ 재생 시작:', contentId);
   };
 
-  const handleRemove = (contentId: number) => {
-    console.log('찜 목록에서 제거:', contentId);
+  const handleRemove = async (contentId: number, contentTitle: string) => {
+    if (!userId) {
+      alert('로그인이 필요합니다.');
+      router.push('/auth/login');
+      return;
+    }
+
+    // 확인 다이얼로그
+    const confirmed = window.confirm(`"${contentTitle}"을(를) 찜 목록에서 제거하시겠습니까?`);
+    if (!confirmed) return;
+
+    try {
+      console.log('🗑️ 찜하기 제거 중... userId:', userId, 'contentId:', contentId);
+      const response = await favoriteApi.removeFavorite(userId, contentId);
+      console.log('📊 찜하기 제거 응답:', response);
+
+      if (response.success) {
+        // UI에서 즉시 제거 (낙관적 업데이트)
+        setFavorites(prev => prev.filter(fav => fav.contentId !== contentId));
+        console.log('✅ 찜하기 제거 성공');
+        alert(`"${contentTitle}"이(가) 찜 목록에서 제거되었습니다.`);
+      } else {
+        alert(response.message || '찜하기 제거에 실패했습니다.');
+      }
+    } catch (err) {
+      console.error('❌ 찜하기 제거 실패:', err);
+      alert('찜하기 제거 중 오류가 발생했습니다. 다시 시도해주세요.');
+    }
   };
 
-  if (favoriteContent.length === 0) {
+  // 로딩 중
+  if (loading) {
+    return (
+      <Container>
+        <Header>
+          <HeaderContent>
+            <HeaderTitle>
+              <Heart size={48} fill="currentColor" />
+              찜한 콘텐츠
+            </HeaderTitle>
+            <HeaderSubtitle>마음에 드는 콘텐츠를 모아보세요</HeaderSubtitle>
+          </HeaderContent>
+        </Header>
+        <Content>
+          <LoadingContainer>
+            <Loader2 size={48} className="animate-spin" />
+            <LoadingText>찜한 콘텐츠를 불러오는 중...</LoadingText>
+          </LoadingContainer>
+        </Content>
+      </Container>
+    );
+  }
+
+  // 에러 발생
+  if (error) {
+    return (
+      <Container>
+        <Header>
+          <HeaderContent>
+            <HeaderTitle>
+              <Heart size={48} fill="currentColor" />
+              찜한 콘텐츠
+            </HeaderTitle>
+            <HeaderSubtitle>마음에 드는 콘텐츠를 모아보세요</HeaderSubtitle>
+          </HeaderContent>
+        </Header>
+        <Content>
+          <ErrorContainer>
+            <Heart size={64} color="currentColor" />
+            <ErrorText>{error}</ErrorText>
+            <Button onClick={() => window.location.reload()}>다시 시도</Button>
+          </ErrorContainer>
+        </Content>
+      </Container>
+    );
+  }
+
+  // 찜한 콘텐츠가 없는 경우
+  if (favorites.length === 0) {
     return (
       <Container>
         <Header>
@@ -533,9 +630,11 @@ export default function FavoritesPage() {
             <EmptyDescription>
               마음에 드는 영화나 시리즈를 찜하면 여기에 표시됩니다.
             </EmptyDescription>
-            <Button size="lg">
-              콘텐츠 둘러보기
-            </Button>
+            <Link href="/movies">
+              <Button size="lg">
+                콘텐츠 둘러보기
+              </Button>
+            </Link>
           </EmptyState>
         </Content>
       </Container>
@@ -554,7 +653,7 @@ export default function FavoritesPage() {
           
           <StatsContainer>
             <StatItem>
-              <StatNumber>{favoriteContent.length}</StatNumber>
+              <StatNumber>{favorites.length}</StatNumber>
               <StatLabel>전체</StatLabel>
             </StatItem>
             <StatItem>
@@ -580,15 +679,15 @@ export default function FavoritesPage() {
                 전체
               </TypeButton>
               <TypeButton
-                $active={selectedType === 'movie'}
-                onClick={() => setSelectedType('movie')}
+                $active={selectedType === 'MOVIE'}
+                onClick={() => setSelectedType('MOVIE')}
               >
                 <Film size={16} />
                 영화
               </TypeButton>
               <TypeButton
-                $active={selectedType === 'series'}
-                onClick={() => setSelectedType('series')}
+                $active={selectedType === 'SERIES'}
+                onClick={() => setSelectedType('SERIES')}
               >
                 <Tv size={16} />
                 시리즈
@@ -615,67 +714,61 @@ export default function FavoritesPage() {
         </FilterSection>
 
         <ContentGrid $view={viewMode}>
-          {filteredContent.map((content) => (
-            <Link key={content.id} href={`/${content.type}s/${content.id}`}>
-              <ContentCard $view={viewMode} hover>
-                <ContentImage $image={content.image} $view={viewMode}>
-                  <ContentOverlay>
-                    <OverlayContent>
-                      <PlayIcon onClick={(e) => {
+          {filteredContent.map((favorite) => {
+            const contentPath = favorite.contentType === 'MOVIE' ? 'movies' : 'series';
+            return (
+              <Link key={favorite.id} href={`/${contentPath}/${favorite.contentId}`}>
+                <ContentCard $view={viewMode} hover>
+                  <ContentImage $image={favorite.contentImage} $view={viewMode}>
+                    <ContentOverlay>
+                      <OverlayContent>
+                        <PlayIcon onClick={(e) => {
+                          e.preventDefault();
+                          handlePlay(favorite.contentId);
+                        }}>
+                          <Play size={20} fill="currentColor" />
+                        </PlayIcon>
+                        <div style={{ flex: 1 }}>
+                          <ContentTitle style={{ color: '#1a1a1a', marginBottom: '4px', fontSize: '16px' }}>
+                            {favorite.contentTitle}
+                          </ContentTitle>
+                          <ContentMeta style={{ color: '#666', fontSize: '12px' }}>
+                            <TypeIcon>
+                              {favorite.contentType === 'MOVIE' ? <Film size={14} /> : <Tv size={14} />}
+                              {favorite.contentType === 'MOVIE' ? '영화' : '시리즈'}
+                            </TypeIcon>
+                          </ContentMeta>
+                        </div>
+                      </OverlayContent>
+                    </ContentOverlay>
+                    
+                    <RemoveButton 
+                      onClick={(e) => {
                         e.preventDefault();
-                        handlePlay(content.id);
-                      }}>
-                        <Play size={20} fill="currentColor" />
-                      </PlayIcon>
-                      <div style={{ flex: 1 }}>
-                        <ContentTitle style={{ color: '#1a1a1a', marginBottom: '4px', fontSize: '16px' }}>
-                          {content.title}
-                        </ContentTitle>
-                        <ContentMeta style={{ color: '#666', fontSize: '12px' }}>
-                          <Rating>
-                            <Star size={14} fill="currentColor" />
-                            {content.rating}
-                          </Rating>
-                          <span>{content.year}</span>
-                          <span>{content.genre}</span>
-                        </ContentMeta>
-                      </div>
-                    </OverlayContent>
-                  </ContentOverlay>
-                  
-                  <RemoveButton onClick={(e) => {
-                    e.preventDefault();
-                    handleRemove(content.id);
-                  }}>
-                    <Trash2 size={16} />
-                  </RemoveButton>
-                </ContentImage>
-                <ContentInfo $view={viewMode}>
-                  <ContentTitle>{content.title}</ContentTitle>
-                  <ContentMeta>
-                    <TypeIcon>
-                      {content.type === 'movie' ? <Film size={16} /> : <Tv size={16} />}
-                      {content.type === 'movie' ? '영화' : '시리즈'}
-                    </TypeIcon>
-                    <Rating>
-                      <Star size={16} fill="currentColor" />
-                      {content.rating}
-                    </Rating>
-                    <span>{content.year}</span>
-                    <span>{content.genre}</span>
-                    {content.type === 'movie' ? (
-                      <span>{content.duration}</span>
-                    ) : (
-                      <span>{content.seasons}시즌 {content.episodes}화</span>
-                    )}
-                  </ContentMeta>
-                  <AddedDate>
-                    {new Date(content.addedDate).toLocaleDateString('ko-KR')}에 추가
-                  </AddedDate>
-                </ContentInfo>
-              </ContentCard>
-            </Link>
-          ))}
+                        e.stopPropagation();
+                        handleRemove(favorite.contentId, favorite.contentTitle);
+                      }}
+                      title="찜 목록에서 제거"
+                    >
+                      <Trash2 size={16} />
+                    </RemoveButton>
+                  </ContentImage>
+                  <ContentInfo $view={viewMode}>
+                    <ContentTitle>{favorite.contentTitle}</ContentTitle>
+                    <ContentMeta>
+                      <TypeIcon>
+                        {favorite.contentType === 'MOVIE' ? <Film size={16} /> : <Tv size={16} />}
+                        {favorite.contentType === 'MOVIE' ? '영화' : '시리즈'}
+                      </TypeIcon>
+                    </ContentMeta>
+                    <AddedDate>
+                      {new Date(favorite.createdAt).toLocaleDateString('ko-KR')}에 추가
+                    </AddedDate>
+                  </ContentInfo>
+                </ContentCard>
+              </Link>
+            );
+          })}
         </ContentGrid>
       </Content>
     </Container>

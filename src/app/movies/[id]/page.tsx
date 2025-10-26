@@ -220,16 +220,24 @@ export default function MovieDetailPage() {
   const [showTrailer, setShowTrailer] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [favoriteLoading, setFavoriteLoading] = useState(false);
-  
-  // 임시 사용자 ID (실제로는 로그인 정보에서 가져와야 함)
-  const TEMP_USER_ID = 1;
+  const [userId, setUserId] = useState<number | null>(null);
+
+  // 사용자 정보 가져오기
+  useEffect(() => {
+    const userDataStr = localStorage.getItem('user');
+    if (userDataStr) {
+      const userData = JSON.parse(userDataStr);
+      setUserId(userData.id);
+      console.log('👤 로그인한 사용자 ID:', userData.id);
+    }
+  }, []);
 
   useEffect(() => {
     const fetchMovie = async () => {
       try {
         setLoading(true);
         setError(null);
-
+        
         if (!params?.id) {
           setError('잘못된 영화 ID입니다.');
           return;
@@ -241,14 +249,18 @@ export default function MovieDetailPage() {
         if (response.success && response.data) {
           setMovie(response.data);
           
-          // 찜 여부 확인
-          try {
-            const favoriteResponse = await favoriteApi.checkFavorite(TEMP_USER_ID, id);
-            if (favoriteResponse.success && favoriteResponse.data) {
-              setIsFavorite(favoriteResponse.data.isFavorite);
+          // 찜 여부 확인 (로그인한 경우에만)
+          if (userId) {
+            try {
+              console.log('🔍 찜 여부 확인 중... userId:', userId, 'contentId:', id);
+              const favoriteResponse = await favoriteApi.checkFavorite(userId, id);
+              console.log('📊 찜 여부 응답:', favoriteResponse);
+              if (favoriteResponse.success && favoriteResponse.data) {
+                setIsFavorite(favoriteResponse.data.isFavorite || false);
+              }
+            } catch (err) {
+              console.error('❌ 찜 여부 확인 실패:', err);
             }
-          } catch (err) {
-            console.log('찜 여부 확인 실패:', err);
           }
         }
       } catch (err) {
@@ -260,7 +272,7 @@ export default function MovieDetailPage() {
     };
 
     fetchMovie();
-  }, [params]);
+  }, [params, userId]);
 
   const handlePlayMovie = () => {
     setShowPlayer(true);
@@ -273,24 +285,35 @@ export default function MovieDetailPage() {
   const handleToggleFavorite = async () => {
     if (!movie || favoriteLoading) return;
 
+    // 로그인 확인
+    if (!userId) {
+      alert('로그인이 필요합니다.');
+      router.push('/auth/login');
+      return;
+    }
+
     try {
       setFavoriteLoading(true);
 
       if (isFavorite) {
-        const response = await favoriteApi.removeFavorite(TEMP_USER_ID, movie.id);
+        console.log('🗑️ 찜 제거 중... userId:', userId, 'contentId:', movie.id);
+        const response = await favoriteApi.removeFavorite(userId, movie.id);
+        console.log('📊 찜 제거 응답:', response);
         if (response.success) {
           setIsFavorite(false);
           alert('찜 목록에서 제거되었습니다.');
         }
       } else {
-        const response = await favoriteApi.addFavorite(TEMP_USER_ID, movie.id);
+        console.log('❤️ 찜 추가 중... userId:', userId, 'contentId:', movie.id);
+        const response = await favoriteApi.addFavorite(userId, movie.id);
+        console.log('📊 찜 추가 응답:', response);
         if (response.success) {
           setIsFavorite(true);
           alert('찜 목록에 추가되었습니다.');
         }
       }
     } catch (err: any) {
-      console.error('찜하기 처리 실패:', err);
+      console.error('❌ 찜하기 처리 실패:', err);
       alert(err.message || '찜하기 처리에 실패했습니다.');
     } finally {
       setFavoriteLoading(false);

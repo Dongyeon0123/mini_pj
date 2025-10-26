@@ -486,25 +486,30 @@ export default function LoginPage() {
         // 토큰 저장
         tokenManager.setToken(response.data.token);
         
-        // 사용자 정보 저장
+        // 사용자 정보 저장 (id 포함)
         const userInfo = {
+          id: response.data.id,
           name: response.data.name,
           email: response.data.email,
           role: response.data.role
         };
-        localStorage.setItem('userInfo', JSON.stringify(userInfo));
+        localStorage.setItem('user', JSON.stringify(userInfo));
         
         console.log('=== 로그인 성공 ===');
         console.log('토큰 저장 완료');
         console.log('사용자 정보 저장 완료:', userInfo);
         
         // 성공 메시지 표시
-        setSuccess('로그인에 성공했습니다! 홈으로 이동합니다.');
+        setSuccess('로그인에 성공했습니다!');
         
-        // 1.5초 후 홈으로 리다이렉트
+        // URL에서 redirect 파라미터 확인
+        const urlParams = new URLSearchParams(window.location.search);
+        const redirectPath = urlParams.get('redirect') || '/';
+        
+        // 0.5초 후 리다이렉트
         setTimeout(() => {
-          router.push('/');
-        }, 1500);
+          router.push(redirectPath);
+        }, 500);
       } else {
         console.log('=== 로그인 실패 ===');
         console.log('실패 이유:', response.message);

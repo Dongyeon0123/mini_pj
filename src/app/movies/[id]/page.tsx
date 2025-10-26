@@ -6,7 +6,7 @@ import styled from 'styled-components';
 import { Play, Plus, Download, Share2, Star, Clock, Calendar, ChevronLeft, Check, Heart } from 'lucide-react';
 import Button from '../../../components/common/Button';
 import VideoPlayer from '../../../components/VideoPlayer';
-import { contentApi, favoriteApi } from '../../../services/api';
+import { contentApi, favoriteApi, watchHistoryApi } from '../../../services/api';
 import type { ContentDetail } from '../../../services/api';
 
 const Container = styled.div`
@@ -221,6 +221,7 @@ export default function MovieDetailPage() {
   const [isFavorite, setIsFavorite] = useState(false);
   const [favoriteLoading, setFavoriteLoading] = useState(false);
   const [userId, setUserId] = useState<number | null>(null);
+  const [initialWatchPosition, setInitialWatchPosition] = useState(0);
 
   // 사용자 정보 가져오기
   useEffect(() => {
@@ -249,9 +250,10 @@ export default function MovieDetailPage() {
         if (response.success && response.data) {
           setMovie(response.data);
           
-          // 찜 여부 확인 (로그인한 경우에만)
+          // 로그인한 경우 찜 여부 및 시청 기록 확인
           if (userId) {
             try {
+              // 찜 여부 확인
               console.log('🔍 찜 여부 확인 중... userId:', userId, 'contentId:', id);
               const favoriteResponse = await favoriteApi.checkFavorite(userId, id);
               console.log('📊 찜 여부 응답:', favoriteResponse);
@@ -260,6 +262,19 @@ export default function MovieDetailPage() {
               }
             } catch (err) {
               console.error('❌ 찜 여부 확인 실패:', err);
+            }
+
+            try {
+              // 시청 기록 확인
+              console.log('🔍 시청 기록 확인 중... userId:', userId, 'contentId:', id);
+              const historyResponse = await watchHistoryApi.getWatchHistory(userId, id);
+              console.log('📊 시청 기록 응답:', historyResponse);
+              if (historyResponse.success && historyResponse.data) {
+                setInitialWatchPosition(historyResponse.data.watchPosition);
+                console.log('⏰ 이어보기 위치:', historyResponse.data.watchPosition, '초');
+              }
+            } catch (err) {
+              console.error('❌ 시청 기록 확인 실패:', err);
             }
           }
         }
@@ -275,11 +290,44 @@ export default function MovieDetailPage() {
   }, [params, userId]);
 
   const handlePlayMovie = () => {
+    if (!movie?.videoUrl) {
+      alert('죄송합니다. 현재 이 콘텐츠는 재생할 수 없습니다.');
+      return;
+    }
+
+    // 이어보기 확인
+    if (initialWatchPosition > 30) { // 30초 이상 시청한 경우
+      const minutes = Math.floor(initialWatchPosition / 60);
+      const seconds = Math.floor(initialWatchPosition % 60);
+      const timeString = minutes > 0 
+        ? `${minutes}분 ${seconds}초` 
+        : `${seconds}초`;
+      
+      const shouldContinue = window.confirm(
+        `이전에 시청한 기록이 있습니다.\n${timeString} 지점부터 이어서 시청하시겠습니까?\n\n확인: 이어보기 | 취소: 처음부터 시청`
+      );
+      
+      if (!shouldContinue) {
+        setInitialWatchPosition(0);
+      }
+    }
+    
     setShowPlayer(true);
   };
 
   const handlePlayTrailer = () => {
     setShowTrailer(true);
+  };
+
+  // 시청 위치 저장 핸들러
+  const handleTimeUpdate = async (position: number) => {
+    if (!userId || !movie) return;
+
+    try {
+      await watchHistoryApi.updateWatchPosition(userId, movie.id, position);
+    } catch (err) {
+      console.error('시청 위치 저장 실패:', err);
+    }
   };
 
   const handleToggleFavorite = async () => {
@@ -340,13 +388,17 @@ export default function MovieDetailPage() {
   return (
     <Container>
       {/* 비디오 플레이어 */}
-      {showPlayer && movie && (
+      {showPlayer && movie && movie.videoUrl && (
         <VideoPlayer
-          src={movie.videoUrl || ''}
+          src={movie.videoUrl}
           poster={movie.image}
           title={movie.title}
           onClose={() => setShowPlayer(false)}
           autoPlay
+          contentId={movie.id}
+          userId={userId || undefined}
+          initialTime={initialWatchPosition}
+          onTimeUpdate={handleTimeUpdate}
         />
       )}
 

@@ -601,3 +601,182 @@ export const favoriteApi = {
     }
   },
 };
+
+// ============================================
+// 시청 기록 API
+// ============================================
+
+export interface WatchHistoryResponse {
+  id: number;
+  userId: number;
+  contentId: number;
+  contentTitle: string;
+  contentImage: string;
+  contentType: string;
+  watchPosition: number;      // 시청 위치 (초)
+  watchDuration: number;       // 총 시청 시간 (초)
+  completed: boolean;          // 시청 완료 여부
+  lastWatchedAt: string;
+  createdAt: string;
+}
+
+export interface SaveWatchHistoryRequest {
+  userId: number;
+  contentId: number;
+  watchPosition: number;
+  completed?: boolean;
+}
+
+export const watchHistoryApi = {
+  // 시청 위치 저장
+  saveWatchHistory: async (
+    request: SaveWatchHistoryRequest
+  ): Promise<ApiResponse<WatchHistoryResponse>> => {
+    try {
+      const url = `${API_BASE_URL}/watch-history`;
+      console.log('💾 시청 위치 저장 API 요청:', url, request);
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: tokenManager.getAuthHeaders(),
+        body: JSON.stringify(request),
+      });
+
+      console.log('📡 응답 상태:', response.status, response.statusText);
+      
+      return await handleApiResponse<WatchHistoryResponse>(
+        response,
+        '시청 위치 저장에 실패했습니다.'
+      );
+    } catch (error) {
+      console.error('❌ 시청 위치 저장 API 에러:', error);
+      throw error;
+    }
+  },
+
+  // 시청 위치 조회
+  getWatchHistory: async (
+    userId: number,
+    contentId: number
+  ): Promise<ApiResponse<WatchHistoryResponse | null>> => {
+    try {
+      const url = `${API_BASE_URL}/watch-history?userId=${userId}&contentId=${contentId}`;
+      console.log('🔍 시청 위치 조회 API 요청:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: tokenManager.getAuthHeaders(),
+      });
+
+      console.log('📡 응답 상태:', response.status, response.statusText);
+      
+      return await handleApiResponse<WatchHistoryResponse | null>(
+        response,
+        '시청 위치 조회에 실패했습니다.'
+      );
+    } catch (error) {
+      console.error('❌ 시청 위치 조회 API 에러:', error);
+      throw error;
+    }
+  },
+
+  // 사용자의 시청 기록 목록 조회
+  getUserWatchHistory: async (
+    userId: number
+  ): Promise<ApiResponse<WatchHistoryResponse[]>> => {
+    try {
+      const url = `${API_BASE_URL}/watch-history/user/${userId}`;
+      console.log('📋 시청 기록 목록 조회 API 요청:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: tokenManager.getAuthHeaders(),
+      });
+
+      console.log('📡 응답 상태:', response.status, response.statusText);
+      
+      return await handleApiResponse<WatchHistoryResponse[]>(
+        response,
+        '시청 기록 목록 조회에 실패했습니다.'
+      );
+    } catch (error) {
+      console.error('❌ 시청 기록 목록 조회 API 에러:', error);
+      throw error;
+    }
+  },
+
+  // 이어보기 목록 조회
+  getContinueWatching: async (
+    userId: number
+  ): Promise<ApiResponse<WatchHistoryResponse[]>> => {
+    try {
+      const url = `${API_BASE_URL}/watch-history/continue/${userId}`;
+      console.log('▶️ 이어보기 목록 조회 API 요청:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: tokenManager.getAuthHeaders(),
+      });
+
+      console.log('📡 응답 상태:', response.status, response.statusText);
+      
+      return await handleApiResponse<WatchHistoryResponse[]>(
+        response,
+        '이어보기 목록 조회에 실패했습니다.'
+      );
+    } catch (error) {
+      console.error('❌ 이어보기 목록 조회 API 에러:', error);
+      throw error;
+    }
+  },
+
+  // 시청 기록 삭제
+  deleteWatchHistory: async (
+    userId: number,
+    contentId: number
+  ): Promise<ApiResponse<null>> => {
+    try {
+      const url = `${API_BASE_URL}/watch-history?userId=${userId}&contentId=${contentId}`;
+      console.log('🗑️ 시청 기록 삭제 API 요청:', url);
+
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: tokenManager.getAuthHeaders(),
+      });
+
+      console.log('📡 응답 상태:', response.status, response.statusText);
+      
+      return await handleApiResponse<null>(
+        response,
+        '시청 기록 삭제에 실패했습니다.'
+      );
+    } catch (error) {
+      console.error('❌ 시청 기록 삭제 API 에러:', error);
+      throw error;
+    }
+  },
+
+  // 시청 위치 빠른 업데이트
+  updateWatchPosition: async (
+    userId: number,
+    contentId: number,
+    position: number
+  ): Promise<ApiResponse<WatchHistoryResponse>> => {
+    try {
+      const url = `${API_BASE_URL}/watch-history/position?userId=${userId}&contentId=${contentId}&position=${Math.floor(position)}`;
+
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: tokenManager.getAuthHeaders(),
+      });
+      
+      return await handleApiResponse<WatchHistoryResponse>(
+        response,
+        '시청 위치 업데이트에 실패했습니다.'
+      );
+    } catch (error) {
+      console.error('❌ 시청 위치 업데이트 API 에러:', error);
+      throw error;
+    }
+  },
+};

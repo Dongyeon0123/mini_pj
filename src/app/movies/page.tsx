@@ -469,20 +469,33 @@ export default function MoviesPage() {
         setLoading(true);
         setError(null);
 
-        const response = await contentApi.getContents({
-          contentType: ContentType.MOVIE,
+        console.log('🎬 영화 API 호출:', {
+          contentType: 'MOVIE',
           genre: selectedGenre,
           keyword: searchQuery,
+          page: currentPage
+        });
+
+        const response = await contentApi.getContents({
+          contentType: ContentType.MOVIE,
+          genre: selectedGenre !== '전체' ? selectedGenre : undefined,
+          keyword: searchQuery || undefined,
+          sortBy: 'latest',
           page: currentPage,
           size: 20,
         });
 
+        console.log('📡 영화 API 응답:', response);
+
         if (response.success && response.data) {
+          console.log('✅ 영화 개수:', response.data.contents.length);
           setMovies(response.data.contents);
           setTotalPages(response.data.pageInfo.totalPages);
+        } else {
+          setError('영화 데이터가 없습니다.');
         }
       } catch (err) {
-        console.error('영화 목록 조회 실패:', err);
+        console.error('❌ 영화 목록 조회 실패:', err);
         setError('영화 목록을 불러오는데 실패했습니다.');
       } finally {
         setLoading(false);
